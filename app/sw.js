@@ -1,7 +1,7 @@
 /* 灵感收纳盒 Service Worker —— 离线缓存（PWA）
  * 策略：安装时预缓存应用外壳；运行时同源请求 cache-first，导航失败回退 index.html。
  * 用户数据（IndexedDB）不经网络，不受此文件影响。 */
-const CACHE = 'inspiration-inbox-v1';
+const CACHE = 'inspiration-inbox-v1.1';
 const SHELL = [
   './',
   './index.html',

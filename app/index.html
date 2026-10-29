@@ -53,15 +53,23 @@
     -webkit-font-smoothing:antialiased;
     padding-bottom:80px;
   }
-  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;
+    -webkit-tap-highlight-color:transparent;}
   textarea,input{font-family:inherit;color:inherit;}
+  /* iOS：输入框字号 ≥16px 规则见各组件原样式（防聚焦时页面自动放大） */
+  /* 触屏设备：按钮留足 44px 触控热区 */
+  @media (pointer:coarse){
+    .icon-btn{width:42px;height:42px;}
+    .text-btn{padding:10px 15px;font-size:14px;}
+    .tab{padding:11px 22px;}
+  }
   ::placeholder{color:var(--text-2);opacity:.7;}
 
   /* ---------- 顶部栏（毛玻璃吸顶） ---------- */
   .topbar{
     position:sticky;top:0;z-index:40;
     display:flex;align-items:center;gap:14px;
-    padding:12px 22px;
+    padding:calc(12px + env(safe-area-inset-top)) 22px 12px;
     background:var(--glass);
     -webkit-backdrop-filter:blur(14px) saturate(1.6);
     backdrop-filter:blur(14px) saturate(1.6);
@@ -118,7 +126,7 @@
   }
   .composer textarea{
     width:100%;min-height:74px;border:none;outline:none;resize:vertical;
-    background:transparent;font-size:15px;line-height:1.7;
+    background:transparent;font-size:16px;line-height:1.7;
   }
   .tag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;}
   .tag-chip{
@@ -128,7 +136,7 @@
   }
   .tag-chip button{font-size:13px;line-height:1;color:var(--accent);opacity:.6;}
   .tag-chip button:hover{opacity:1;}
-  .tag-input{border:none;outline:none;background:transparent;font-size:13px;
+  .tag-input{border:none;outline:none;background:transparent;font-size:16px;
     min-width:120px;flex:1;padding:4px 0;}
   .composer-tools{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
   .space-hint{font-size:11px;color:var(--text-2);}
@@ -229,6 +237,27 @@
     box-shadow:0 8px 30px rgba(0,0,0,.2);max-width:88vw;text-align:center;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .backup-reminder-mini{display:none;}
+  /* 手机端细节：窄屏下顶栏自动换行不溢出；底部留出手势条安全区 */
+  @media (max-width:600px){
+    .topbar{padding-left:14px;padding-right:14px;gap:10px;}
+    .logo{font-size:15px;}
+    .search-box input{font-size:16px;}
+    .search-box{order:3;flex-basis:100%;max-width:none;}
+    .backup-reminder{display:none;}
+    .backup-reminder-mini{display:inline;font-size:11px;color:var(--text-2);margin-left:auto;}
+    .backup-reminder-mini.warn{color:var(--danger);font-weight:600;}
+    .save-btn{margin-left:0;}
+    .tabs{padding:14px 14px 4px;}
+    .masonry{padding:0 14px;}
+    .composer{width:calc(100% - 28px);}
+    body{padding-bottom:calc(40px + env(safe-area-inset-bottom));}
+  }
+  /* 独立 PWA 窗口里给顶部状态栏留出主题色背景 */
+  @media (display-mode:standalone){
+    .topbar{padding-top:calc(10px + env(safe-area-inset-top));}
+  }
 </style>
 </head>
 <body>
@@ -242,8 +271,9 @@
   </div>
   <div class="top-actions">
     <span id="backupReminder" class="backup-reminder"></span>
+    <button id="installBtn" class="text-btn" style="display:none" title="把应用安装到桌面/主屏幕">📲 安装 App</button>
     <button id="backupDirBtn" class="text-btn" style="display:none" title="授权后自动备份将静默覆盖写入该文件夹">授权备份文件夹</button>
-    <button id="exportBtn" class="text-btn">导出 JSON</button>
+    <button id="exportBtn" class="text-btn">导出备份</button>
     <button id="importBtn" class="text-btn">导入</button>
     <button id="themeBtn" class="icon-btn" title="日/夜模式">🌙</button>
   </div>
@@ -269,6 +299,7 @@
       <button id="imgRemoveBtn" title="移除图片">×</button>
     </div>
     <span class="space-hint">将封存至：<b id="spaceHint">工作台</b></span>
+    <span id="backupReminderMini" class="backup-reminder-mini"></span>
     <button id="saveBtn" class="save-btn" disabled>封存碎片</button>
   </div>
 </section>
@@ -386,6 +417,17 @@ const utils = {
   debounce(fn, ms=250){
     let timer;
     return (...args)=>{ clearTimeout(timer); timer=setTimeout(()=>fn(...args),ms); };
+  },
+
+  // iOS/iPadOS 检测（分享导出策略不同；含 Apple Silicon iPad 伪装成 Mac 的情况）
+  get isIOS(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  },
+
+  // 触屏设备检测（用于隐藏只有桌面 Chromium 才支持的文件夹授权）
+  get isTouch(){
+    return window.matchMedia('(pointer: coarse)').matches;
   }
 };
 
@@ -670,19 +712,28 @@ const render = {
     $('#saveBtn').disabled = !hasContent;
   },
 
-  // 顶部"距上次导出 X 天"提醒（>3 天变红）
+  // "距上次导出 X 天"提醒（>3 天变红）；顶栏与手机端录入区两处同步
   async backupReminder(){
-    const el = $('#backupReminder');
     const last = await db.getSetting('lastExportAt');
-    if(!last){ el.textContent='⚠ 尚未备份，封存后自动备份'; el.classList.add('warn'); return; }
-    const days = Math.floor((Date.now()-last)/86400000);
-    el.textContent = days<=0 ? '✓ 今天已备份' : `上次备份：${days} 天前`;
-    el.classList.toggle('warn', days>3);
+    let text, warn;
+    if(!last){ text='⚠ 尚未备份，记得点导出'; warn=true; }
+    else{
+      const days = Math.floor((Date.now()-last)/86400000);
+      text = days<=0 ? '✓ 今天已备份' : `上次备份：${days} 天前`;
+      warn = days>3;
+    }
+    ['#backupReminder','#backupReminderMini'].forEach(sel=>{
+      const el = $(sel);
+      if(!el) return;
+      el.textContent = text;
+      el.classList.toggle('warn', warn);
+    });
   },
 
-  // Chrome/Edge 才显示"授权备份文件夹"按钮
+  // 仅桌面 Chromium（鼠标指针 + API 齐全）才显示"授权备份文件夹"
   backupDirButton(){
-    const supported = 'showDirectoryPicker' in window;
+    const supported = 'showDirectoryPicker' in window
+      && window.matchMedia('(pointer: fine)').matches;
     const btn = $('#backupDirBtn');
     btn.style.display = supported ? '' : 'none';
   }
@@ -702,6 +753,7 @@ const backup = {
   },
 
   // manual=true 时强制执行（手动点导出）；封存后自动调用时先比对指纹
+  // 返回值：unchanged / dir / shared / download / skipped(ios 自动模式) / cancelled(用户取消分享)
   async run(manual=false){
     const items = state.items;
     const fingerprint = utils.fingerprint(items);
@@ -709,9 +761,25 @@ const backup = {
       return 'unchanged'; // 数据没有任何变化，不产生重复备份
     }
     const json = JSON.stringify(this.buildPayload(items), null, 2);
-    let mode = 'download';
 
-    // Chrome/Edge：若已授权文件夹，则静默覆盖写入 latest.json
+    // iOS 自动备份不弹系统分享（太打扰），也不触发可能失效的静默下载：
+    // 交给顶部"X 天未备份"提醒，由用户手动点「导出备份」走分享面板
+    if(!manual && utils.isIOS && !(await db.getSetting('backupDirHandle'))){
+      return 'skipped';
+    }
+
+    const mode = await this._deliver(json, manual);
+    if(mode === 'cancelled') return 'cancelled';
+
+    await db.setSetting('lastBackupHash', fingerprint);
+    await db.setSetting('lastExportAt', Date.now());
+    render.backupReminder();
+    return mode;
+  },
+
+  // 选择交付方式：授权文件夹 → 手动分享面板 → 普通下载
+  async _deliver(json, manual){
+    // 1) 电脑 Chrome/Edge：已授权文件夹则静默覆盖写入 latest.json
     const handle = await db.getSetting('backupDirHandle');
     if(handle){
       try{
@@ -725,21 +793,31 @@ const backup = {
             await this._writeToDir(handle, `inspiration-backup-${utils.dateStr()}.json`, json);
             await db.setSetting('lastArchiveAt', Date.now());
           }
-          mode = 'dir';
+          return 'dir';
         }
       }catch(err){
-        console.warn('文件夹备份失败，降级为下载：', err);
+        console.warn('文件夹备份失败，降级处理：', err);
       }
     }
 
-    if(mode === 'download'){
-      utils.download('inspiration-backup-latest.json', json);
+    // 2) 手动导出 + 系统支持分享文件 → 调系统分享面板
+    //    iPad/iPhone：存储到"文件"、微信、隔空投送；安卓：保存到下载/微信等
+    if(manual && (utils.isIOS || utils.isTouch) && navigator.canShare){
+      try{
+        const file = new File([json], 'inspiration-backup-latest.json', {type:'application/json'});
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({files:[file], title:'灵感收纳盒 · 数据备份'});
+          return 'shared';
+        }
+      }catch(err){
+        if(err && err.name === 'AbortError') return 'cancelled'; // 用户主动取消
+        console.warn('系统分享失败，降级为下载：', err);
+      }
     }
 
-    await db.setSetting('lastBackupHash', fingerprint);
-    await db.setSetting('lastExportAt', Date.now());
-    render.backupReminder();
-    return mode;
+    // 3) 兜底：普通下载（安卓 Chrome/桌面浏览器静默进下载目录）
+    utils.download('inspiration-backup-latest.json', json);
+    return 'download';
   },
 
   async _writeToDir(dirHandle, filename, content){
@@ -801,7 +879,14 @@ function bindEvents(){
       render.tagChips(); render.imagePreview(); render.saveButton();
       render.all();
       const mode = await backup.run(false);
-      toast(mode==='unchanged' ? '已封存' : mode==='dir' ? '已封存并备份到文件夹' : '已封存，备份已下载');
+      const msgMap = {
+        unchanged:'已封存',
+        dir:'已封存并备份到文件夹',
+        download:'已封存，备份已下载',
+        shared:'已封存',
+        skipped:'已封存（记得点「导出备份」存到文件）'
+      };
+      toast(msgMap[mode] || '已封存');
     }catch(err){
       console.error(err);
       toast('封存失败，请查看控制台');
@@ -902,8 +987,33 @@ function bindEvents(){
   // —— 手动导出 / 导入 / 授权备份文件夹 ——
   $('#exportBtn').addEventListener('click', async ()=>{
     const mode = await backup.run(true);
-    toast(mode==='dir' ? '已覆盖写入备份文件夹' : '已导出 JSON');
+    const msgMap = {
+      dir:'已覆盖写入备份文件夹',
+      shared:'已打开系统分享，可存储到"文件"/微信',
+      download:'备份文件已开始下载',
+      cancelled:'已取消导出'
+    };
+    toast(msgMap[mode] || '已导出备份');
   });
+
+  // —— PWA 安装（桌面 Chromium / 安卓 Chromium 内核浏览器会触发）——
+  let deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    deferredInstall = e;
+    $('#installBtn').style.display = '';
+  });
+  $('#installBtn').addEventListener('click', async ()=>{
+    if(!deferredInstall) return;
+    deferredInstall.prompt();
+    const choice = await deferredInstall.userChoice;
+    if(choice && choice.outcome === 'accepted'){
+      $('#installBtn').style.display = 'none';
+      toast('已安装到桌面/主屏幕');
+    }
+    deferredInstall = null;
+  });
+  window.addEventListener('appinstalled', ()=>{ $('#installBtn').style.display='none'; });
 
   $('#importBtn').addEventListener('click', ()=>$('#importInput').click());
   $('#importInput').addEventListener('change', async (e)=>{

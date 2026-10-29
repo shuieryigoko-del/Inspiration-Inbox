@@ -264,7 +264,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.2</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -335,6 +335,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
+const APP_VERSION = '1.2';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -846,9 +847,26 @@ let toastTimer;
 function toast(msg){
   const el = $('#toast');
   el.textContent = msg;
+  el.style.pointerEvents = 'none';
+  el.style.cursor = 'default';
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>el.classList.remove('show'), 2600);
+}
+
+// 版本更新提示：常驻、可点击，点击后立即接管新版并刷新
+function showUpdateToast(onClick){
+  const el = $('#toast');
+  el.textContent = '🔄 发现新版本，点此立即更新';
+  el.style.pointerEvents = 'auto';
+  el.style.cursor = 'pointer';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  const handler = ()=>{
+    el.removeEventListener('click', handler);
+    onClick();
+  };
+  el.addEventListener('click', handler);
 }
 
 function bindEvents(){
@@ -1079,7 +1097,32 @@ async function setupPWA(){
   document.head.appendChild(theme);
 
   try{
-    await navigator.serviceWorker.register('sw.js');
+    const reg = await navigator.serviceWorker.register('sw.js');
+
+    // 新版本接管后自动刷新一次（仅发生在启动瞬间，不会打断录入）
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+      if(refreshing) return;
+      refreshing = true;
+      location.reload();
+    });
+
+    // 发现等待中的新版 → 顶部出现可点击提示，点一下立即更新
+    const promptUpdate = (worker)=>{
+      showUpdateToast(()=>{
+        worker.postMessage({type:'SKIP_WAITING'});
+      });
+    };
+    if(reg.waiting && navigator.serviceWorker.controller) promptUpdate(reg.waiting);
+    reg.addEventListener('updatefound', ()=>{
+      const worker = reg.installing;
+      if(!worker) return;
+      worker.addEventListener('statechange', ()=>{
+        if(worker.state === 'installed' && navigator.serviceWorker.controller){
+          promptUpdate(worker);
+        }
+      });
+    });
   }catch(err){
     console.warn('Service Worker 注册失败（不影响使用）：', err);
   }

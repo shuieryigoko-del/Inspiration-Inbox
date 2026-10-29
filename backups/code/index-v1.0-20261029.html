@@ -943,6 +943,39 @@ function bindEvents(){
 }
 
 /* ============================================================
+ * PWA 启动层：仅在 http(s) 托管环境启用（GitHub Pages / localhost）
+ * 双击 file:// 打开时直接跳过，保证单文件离线版零外部依赖。
+ * 作用：可"安装到桌面/主屏幕"、全屏运行、Service Worker 离线缓存。
+ * ============================================================ */
+async function setupPWA(){
+  // file:// 协议下什么都不做（单文件作业提交版保持纯净）
+  if(location.protocol === 'file:') return;
+  if(!('serviceWorker' in navigator)) return;
+
+  // 动态挂载清单与 iOS 主屏幕图标，避免单文件版出现无效引用
+  const manifest = document.createElement('link');
+  manifest.rel = 'manifest';
+  manifest.href = 'manifest.webmanifest';
+  document.head.appendChild(manifest);
+
+  const appleIcon = document.createElement('link');
+  appleIcon.rel = 'apple-touch-icon';
+  appleIcon.href = 'icons/apple-touch-icon.png';
+  document.head.appendChild(appleIcon);
+
+  const theme = document.createElement('meta');
+  theme.name = 'theme-color';
+  theme.content = '#5E5CE6';
+  document.head.appendChild(theme);
+
+  try{
+    await navigator.serviceWorker.register('sw.js');
+  }catch(err){
+    console.warn('Service Worker 注册失败（不影响使用）：', err);
+  }
+}
+
+/* ============================================================
  * 第 6 层：启动入口
  * ============================================================ */
 async function init(){
@@ -964,6 +997,9 @@ async function init(){
     if(await db.getSetting('backupDirHandle')){
       $('#backupDirBtn').textContent = '✓ 备份文件夹已连接';
     }
+
+    // 托管环境下启用 PWA（离线缓存/可安装），file:// 下自动跳过
+    setupPWA();
   }catch(err){
     console.error('启动失败：', err);
     document.body.insertAdjacentHTML?.('beforeend','');

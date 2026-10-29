@@ -4,7 +4,7 @@
  *   - 图标等静态资源：缓存优先，后台更新
  *   - 安装时用 cache-busting 预缓存，避免拿到 HTTP 缓存里的旧文件
  * 用户数据（IndexedDB）不经网络，不受此文件影响。 */
-const CACHE = 'inspiration-inbox-v1.2';
+const CACHE = 'inspiration-inbox-v1.3';
 const SHELL = [
   './',
   './index.html',

@@ -1,0 +1,11 @@
+# 浏览器自动化临时截图
+.screenshots/
+
+# 用户隐私数据（灵感 JSON 备份绝不进公开仓库）
+backups/data/*.json
+backups/data/*.md
+
+# 系统垃圾
+Thumbs.db
+desktop.ini
+.DS_Store

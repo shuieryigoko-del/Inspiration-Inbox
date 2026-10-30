@@ -168,7 +168,9 @@
     transition:transform .18s ease,box-shadow .18s ease;cursor:pointer;position:relative;
   }
   .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);}
+  .card-img-wrap{width:100%;overflow:hidden;background:var(--bg);}
   .card img.card-img{width:100%;display:block;}
+  .card img.card-img.cover{height:100%;object-fit:cover;}
   .card-body{padding:13px 15px 14px;}
   .card-content{font-size:14px;white-space:pre-wrap;word-break:break-word;}
   /* 正文内自动识别的链接（V1.4）：品牌色 + 下划线，长链接换行不撑破卡片 */
@@ -200,8 +202,10 @@
     opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:45;
   }
   .scrim.open{opacity:1;}
+  /* 抽屉宽度同时用于"抽屉本体"和"打开时给背景让出的空间"（V1.4.1） */
+  :root{--drawer-w:clamp(340px,40vw,580px);}
   .drawer{
-    position:fixed;top:0;right:0;height:100vh;width:40%;min-width:340px;max-width:580px;
+    position:fixed;top:0;right:0;height:100vh;width:var(--drawer-w);
     background:var(--glass);
     -webkit-backdrop-filter:blur(20px) saturate(1.5);
     backdrop-filter:blur(20px) saturate(1.5);
@@ -212,6 +216,12 @@
     z-index:50;display:flex;flex-direction:column;
   }
   .drawer.open{transform:translateX(0);}
+  /* 抽屉打开时顶栏与瀑布流让出右侧空间，卡片不再被盖住（桌面/平板） */
+  @media(min-width:769px){
+    .topbar,.masonry{transition:padding-right .32s cubic-bezier(.22,.9,.3,1);}
+    body.drawer-open .topbar,
+    body.drawer-open .masonry{padding-right:calc(var(--drawer-w) + 14px);}
+  }
   .drawer-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
   .drawer-title{font-size:13px;color:var(--text-2);flex:1;letter-spacing:1px;}
   .drawer-body{flex:1;overflow-y:auto;padding:20px 22px 40px;}
@@ -220,7 +230,7 @@
   .drawer-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px;}
   .drawer-time{margin-top:22px;font-size:12px;color:var(--text-2);}
 
-  /* 手机端：抽屉从底部滑出，占屏 60% */
+  /* 手机端：抽屉从底部滑出，占屏 60%；打开时列表底部留白，卡片可滚到抽屉上方 */
   @media (max-width:768px){
     .drawer{
       top:auto;bottom:0;left:0;right:0;width:100%;max-width:none;height:62vh;min-width:0;
@@ -229,6 +239,8 @@
       transform:translateY(105%);
     }
     .drawer.open{transform:translateY(0);}
+    .masonry{transition:padding-bottom .32s cubic-bezier(.22,.9,.3,1);}
+    body.drawer-open .masonry{padding-bottom:62vh;}
   }
 
   /* ---------- 云同步设置弹窗 ---------- */
@@ -302,7 +314,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4.1</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -450,7 +462,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.4.1';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -494,7 +506,8 @@ const utils = {
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img,0,0,w,h);
-          resolve(canvas.toDataURL('image/jpeg',0.82));
+          // 返回 dataURL 与压缩后尺寸：渲染时用 aspect-ratio 预留高度，图片加载不再跳动（V1.4.1）
+          resolve({src:canvas.toDataURL('image/jpeg',0.82), w, h});
         };
         img.onerror = reject;
         img.src = reader.result;
@@ -527,7 +540,8 @@ const utils = {
 
   // 标签解析：以空格 / 逗号分隔，自动补 #
   parseTags(raw){
-    return raw.split(/[\s,，、]+/).map(t=>t.replace(/^#+/,'').trim()).filter(Boolean);
+    // 空格/逗号/顿号/# 均可作为标签分隔符——"#A#B#C"连写也能拆成三个（V1.4.1）
+    return raw.split(/[\s,，、#]+/).map(t=>t.replace(/^#+/,'').trim()).filter(Boolean);
   },
 
   debounce(fn, ms=250){
@@ -664,9 +678,10 @@ const render = {
       .sort((a,b)=>b.createdAt-a.createdAt);
   },
 
-  // 当前视口应分几列（与 CSS 断点保持一致）
+  // 按瀑布流容器的实际可见宽度分列（抽屉打开让出空间时也会正确降列，V1.4.1）
   columnCount(){
-    const w = window.innerWidth || document.documentElement.clientWidth || 1024;
+    const box = $('#masonry');
+    const w = (box && box.clientWidth) || window.innerWidth || 1024;
     return w <= 600 ? 1 : (w <= 1024 ? 2 : 3);
   },
 
@@ -684,6 +699,7 @@ const render = {
       return;
     }
     const n = this.columnCount();
+    state._cols = n;
     const cols = [];
     for(let i=0;i<n;i++){
       const col = document.createElement('div');
@@ -691,42 +707,31 @@ const render = {
       box.appendChild(col);
       cols.push(col);
     }
-    // 逐张放入"当前最矮的列"，形成瀑布流（同步测量文本卡高度）
-    let hasImage = false;
+    // 逐张放入"当前最矮的列"，形成瀑布流。
+    // V1.4.1 起：图片卡用 aspect-ratio 预留高度（新数据带尺寸，同步测量即准确），
+    // 卡片一旦放入某列就不再移动——旧版图片加载后跨列重平衡会造成"飞到别处又回来"的闪烁。
     list.forEach(item=>{
       let target = cols[0];
       for(let i=1;i<cols.length;i++){
         if(cols[i].scrollHeight < target.scrollHeight) target = cols[i];
       }
-      const card = this.card(item);
-      if(item.image){
-        hasImage = true;
-        // 图片解码后高度才确定：等所有图片就绪再重排一次
-        const img = card.querySelector('img.card-img');
-        if(img && !img.complete){
-          img.addEventListener('load', ()=>this._scheduleRebalance(), {once:true});
-          img.addEventListener('error', ()=>this._scheduleRebalance(), {once:true});
-        }
-      }
-      target.appendChild(card);
+      target.appendChild(this.card(item));
     });
-    if(hasImage) this._scheduleRebalance();
   },
 
-  // 图片加载后把卡片在现有列之间重新平衡一次（只移动节点、不重建，避免重复触发 load）
-  _scheduleRebalance(){
-    clearTimeout(this._rbTimer);
-    this._rbTimer = setTimeout(()=>{
-      const box = $('#masonry');
-      const curCols = [...box.children].filter(c=>c.classList && c.classList.contains('masonry-col'));
-      if(curCols.length < 2) return;
-      const nodes = curCols.map(c=>[...c.children]).flat();
-      nodes.forEach(node=>{
-        let target = curCols[0];
-        curCols.forEach(c=>{ if(c.scrollHeight < target.scrollHeight) target = c; });
-        target.appendChild(node);
-      });
-    }, 120);
+  // 容器宽度变化（抽屉开合、横竖屏）导致列数改变时才重建；高度变化不触发
+  watchColumns(){
+    if(typeof ResizeObserver === 'undefined'){
+      window.addEventListener('resize', ()=>this._maybeRebuildColumns());
+      return;
+    }
+    const ro = new ResizeObserver(()=>this._maybeRebuildColumns());
+    ro.observe($('#masonry'));
+  },
+  _maybeRebuildColumns(){
+    if(state.drawerId) return; // 抽屉开关过程中不重建，关闭后再统一恢复（避免动画中双重跳动）
+    const n = this.columnCount();
+    if(n !== state._cols) this.cards();
   },
 
   // 把正文中的 http(s) 链接安全地拆成"文本节点 + 可点击 <a>"（V1.4）。
@@ -776,12 +781,28 @@ const render = {
     card.dataset.id = item.id;
 
     if(item.image){
+      const wrap = document.createElement('div');
+      wrap.className = 'card-img-wrap';
       const img = document.createElement('img');
       img.className = 'card-img';
       img.src = item.image;
       img.alt = '';
       img.loading = 'lazy';
-      card.appendChild(img);
+      if(item.imageW && item.imageH){
+        // 新数据：图片解码前就按比例占位，同列卡片不会被下推、卡片不闪
+        wrap.style.aspectRatio = (item.imageW/item.imageH).toFixed(4);
+        img.classList.add('cover');
+      }else{
+        // V1.4.1 之前的旧图片没有尺寸：解码后补写比例（仅影响本卡，不移动其他卡片）
+        img.addEventListener('load', ()=>{
+          if(img.naturalWidth){
+            wrap.style.aspectRatio = (img.naturalWidth/img.naturalHeight).toFixed(4);
+            img.classList.add('cover');
+          }
+        }, {once:true});
+      }
+      wrap.appendChild(img);
+      card.appendChild(wrap);
     }
 
     const body = document.createElement('div');
@@ -861,6 +882,7 @@ const render = {
     this.drawer(item);
     $('#drawer').classList.add('open');
     $('#scrim').classList.add('open');
+    document.body.classList.add('drawer-open'); // 背景让出抽屉空间（V1.4.1）
     $('#drawer').setAttribute('aria-hidden','false');
   },
 
@@ -868,6 +890,7 @@ const render = {
     state.drawerId = null;
     $('#drawer').classList.remove('open');
     $('#scrim').classList.remove('open');
+    document.body.classList.remove('drawer-open');
     $('#drawer').setAttribute('aria-hidden','true');
   },
 
@@ -904,7 +927,7 @@ const render = {
     const box = $('#imgPreview');
     if(state.pendingImage){
       box.style.display='block';
-      box.querySelector('img').src = state.pendingImage;
+      box.querySelector('img').src = state.pendingImage.src;
     }else{
       box.style.display='none';
       box.querySelector('img').src='';
@@ -967,9 +990,10 @@ const backup = {
     }
     const json = JSON.stringify(this.buildPayload(items), null, 2);
 
-    // iOS 自动备份不弹系统分享（太打扰），也不触发可能失效的静默下载：
-    // 交给顶部"X 天未备份"提醒，由用户手动点「导出备份」走分享面板
-    if(!manual && utils.isIOS && !(await db.getSetting('backupDirHandle'))){
+    // 自动备份（封存后触发）在未授权文件夹时一律不弹窗、不下载：
+    // 否则浏览器若开了"下载前询问保存位置"会每存一条弹一次另存为，静默下载也会堆积文件。
+    // 数据安全交给：顶部"X 天未备份"红色提醒 + 手动「导出备份」+ 云同步（V1.4.1）
+    if(!manual && !(await db.getSetting('backupDirHandle'))){
       return 'skipped';
     }
 
@@ -1383,7 +1407,9 @@ function bindEvents(){
       type: state.pendingImage ? 'image' : 'text',
       content,
       tags: [...new Set(state.pendingTags)],
-      image: state.pendingImage,
+      image: state.pendingImage ? state.pendingImage.src : null,
+      imageW: state.pendingImage ? state.pendingImage.w : null,  // 图片原始尺寸（瀑布流占位用）
+      imageH: state.pendingImage ? state.pendingImage.h : null,
       parentId: null,          // V2.0 关联功能预留
       audioUrl: null,          // V2.1 音乐卡预留
       coverImg: null,
@@ -1405,7 +1431,7 @@ function bindEvents(){
         dir:'已封存并备份到文件夹',
         download:'已封存，备份已下载',
         shared:'已封存',
-        skipped:'已封存（记得点「导出备份」存到文件）'
+        skipped:'已封存'
       };
       toast(msgMap[mode] || '已封存');
       cloudSync.schedule(); // 已配置同步则几秒后自动上传
@@ -1782,6 +1808,7 @@ async function init(){
     render.saveButton();
     render.backupDirButton();
     render.all();
+    render.watchColumns(); // 容器宽度变化（横竖屏）跨断点时重建列（V1.4.1）
     bindEvents();
 
     // 已授权过文件夹时，按钮显示已连接

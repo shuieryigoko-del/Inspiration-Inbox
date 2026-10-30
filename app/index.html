@@ -299,7 +299,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.3.2</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.3.3</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -411,6 +411,13 @@
         <li><b>其他浏览器：</b>菜单「⋮」→「安装应用」或「添加到主屏幕」。</li>
       </ol>
       <p class="hint">请直接在浏览器里打开本网页再操作，不要从桌面旧图标点进来；装好新图标后，旧的书签式图标（顶部带地址栏的那个）可以删掉。</p>
+      <p class="hint"><b>提示"已添加/已下载"但桌面上找不到图标，按顺序排查：</b></p>
+      <ol class="install-steps">
+        <li>左右滑动桌面的每一屏、翻开所有文件夹——新图标有时被放到最后一屏。</li>
+        <li>关闭「锁定桌面布局」：长按桌面空白处 →「桌面设置」（或 系统设置 → 桌面和壁纸 → 桌面设置），关掉「锁定布局」后，回到网页重新添加一次。</li>
+        <li>出境易用户：打开「出境易」App 本体，图标很可能被放进了<b>它内部的桌面</b>；在里面长按本应用图标，选「添加到主屏幕」。同时到 系统设置 → 应用和服务 → 应用管理 → 出境易 → 权限，允许「创建桌面快捷方式」。</li>
+        <li>以上都不行就用<b>华为浏览器</b>打开网址 → 菜单 →「添加至桌面」兜底，图标一定能出现（这种方式打开时顶部带地址栏，功能完全一样）。</li>
+      </ol>
     </div>
 
     <div class="sync-actions">
@@ -438,7 +445,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.3.2';
+const APP_VERSION = '1.3.3';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';

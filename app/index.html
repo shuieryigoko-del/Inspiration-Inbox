@@ -314,7 +314,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4.1</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4.2</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -462,7 +462,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1188,6 +1188,14 @@ const cloudSync = {
     return { fragments:[...byId.values()].filter(x=>!dead.has(x.id)), tombstones:tombs };
   },
 
+  // 合并后整体状态的指纹（碎片全量字段 + 墓碑，顺序无关）：
+  // 与上次成功推送的指纹相同就跳过全量上传，避免每轮轮询把整个 Gist 重传一遍
+  _stateHash(fragments, tombs){
+    const f = fragments.map(x=>JSON.stringify(x)).sort();
+    const t = (tombs||[]).map(x=>`${x.id}:${x.at}`).sort().join(',');
+    return utils.hash(JSON.stringify(f) + '|' + t);
+  },
+
   // ---------- 同步主流程：拉取 → 合并 → 推送 ----------
   async sync({manual=false}={}){
     const token = await db.getSetting('syncToken');
@@ -1203,29 +1211,69 @@ const cloudSync = {
 
       let remotePlain = null;
       let remoteSalt = null;
+      let notModified = false;
+      let etag = await db.getSetting('syncEtag');
+
       if(gistId){
-        const gist = await this._api('/gists/'+gistId, token);
-        if(!gist.files || !gist.files[GIST_FILENAME]){ gistId = null; }
-        else{
-          const raw = await this._readGistContent(gist);
-          if(raw.trim()){
-            try{
-              const env = JSON.parse(raw);
-              remoteSalt = env.salt || null;
-              remotePlain = await this.decrypt(env, password);
-            }catch(err){
-              throw new Error('云端数据解密失败：同步密码是否正确？');
+        // 条件请求：带上 ETag，云端未变时 GitHub 只回 304（几百字节），
+        // 不再每轮轮询都下载近 1MB 的密文（同步文件随图片增大后这是变慢主因）
+        const headers = {
+          'Accept':'application/vnd.github+json',
+          'Authorization':'Bearer ' + token,
+          'X-GitHub-Api-Version':'2022-11-28'
+        };
+        if(etag) headers['If-None-Match'] = etag;
+        const res = await fetch(GIST_API + '/gists/' + gistId, {headers, cache:'no-store'});
+        if(res.status === 304){
+          notModified = true; // 云端自上次拉取以来没有任何变化
+        }else if(!res.ok){
+          const detail = await res.text().catch(()=> '');
+          throw new Error('HTTP ' + res.status + ' ' + detail.slice(0,150));
+        }else{
+          etag = res.headers.get('ETag') || etag;
+          const gist = await res.json();
+          if(!gist.files || !gist.files[GIST_FILENAME]){ gistId = null; etag = ''; }
+          else{
+            const raw = await this._readGistContent(gist);
+            if(raw.trim()){
+              try{
+                const env = JSON.parse(raw);
+                remoteSalt = env.salt || null;
+                remotePlain = await this.decrypt(env, password);
+              }catch(err){
+                throw new Error('云端数据解密失败：同步密码是否正确？');
+              }
             }
           }
         }
       }
 
       const localItems = await db.getAll();
-      const localTombs = (await db.getSetting('tombstones')) || [];
-      const merged = this._merge(localItems, localTombs, remotePlain);
-      await db.replaceAll(merged.fragments);
-      await db.setSetting('tombstones', merged.tombstones);
-      state.items = merged.fragments;
+      const localTombs = this._pruneTombs((await db.getSetting('tombstones')) || []);
+      let mergedFragments, mergedTombstones;
+      if(notModified){
+        // 云端没变：本机库就是最新合并结果，无需解密合并、无需重写库
+        mergedFragments = localItems;
+        mergedTombstones = localTombs;
+      }else{
+        const merged = this._merge(localItems, localTombs, remotePlain);
+        mergedFragments = merged.fragments;
+        mergedTombstones = merged.tombstones;
+        await db.replaceAll(mergedFragments);
+        await db.setSetting('tombstones', mergedTombstones);
+        state.items = mergedFragments;
+        if(etag) await db.setSetting('syncEtag', etag);
+      }
+
+      // 指纹与上次成功推送一致 → 双方都没有新内容，跳过全量 PATCH（省去近 1MB 上传）
+      const stateHash = this._stateHash(mergedFragments, mergedTombstones);
+      const lastHash = await db.getSetting('syncStateHash');
+      if(gistId && stateHash === lastHash){
+        await db.setSetting('lastSyncAt', Date.now());
+        renderSyncUI();
+        if(manual) toast('☁ 同步完成（无更新）');
+        return 'ok';
+      }
 
       // 盐以云端信封为准（保证三端同密码→同密钥）；首次上传则沿用本机盐或新生成
       const useSalt = remoteSalt
@@ -1233,7 +1281,7 @@ const cloudSync = {
         || this._b64(crypto.getRandomValues(new Uint8Array(16)).buffer);
       const payload = {
         app:'inspiration-inbox', kind:'sync', version:1,
-        updatedAt:Date.now(), fragments:merged.fragments, deletedIds:merged.tombstones
+        updatedAt:Date.now(), fragments:mergedFragments, deletedIds:mergedTombstones
       };
       const env = await this.encrypt(payload, password, useSalt);
       const body = {
@@ -1250,6 +1298,8 @@ const cloudSync = {
 
       await db.setSetting('syncGistId', gistId);
       await db.setSetting('syncSalt', useSalt);
+      await db.setSetting('syncStateHash', stateHash);
+      await db.setSetting('syncEtag', ''); // 文件已被本机改写，旧 ETag 作废，下次完整拉取
       await db.setSetting('lastSyncAt', Date.now());
 
       render.all();
@@ -1300,6 +1350,10 @@ const cloudSync = {
   async clearConfig(){
     await db.setSetting('syncToken', null);
     await db.setSetting('syncPassword', null);
+    // 同步状态一并清除：换账号/换 Gist 重新配置时不能沿用旧的 Gist id、指纹与 ETag
+    await db.setSetting('syncGistId', null);
+    await db.setSetting('syncStateHash', null);
+    await db.setSetting('syncEtag', null);
   },
 
   // ---------- UI ----------

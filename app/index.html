@@ -299,7 +299,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.3.1</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.3.2</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -400,7 +400,7 @@
         <li>在分享菜单里往下滑，点「添加到主屏幕」；如果出现「以网页 App 方式打开」开关，请把它打开。</li>
         <li>点右上角「添加」，主屏幕就会出现紫底白「灵」字的图标。</li>
       </ol>
-      <p class="hint">Safari 与 Edge 的本地数据互相独立：装好后第一次打开，点顶栏「☁ 云同步」即可拉取数据。</p>
+      <p class="hint">⚠️ 主屏幕 App 第一次打开时里面可能是空的——iOS 规定它与 Safari 标签页（以及 Edge）各自是独立的数据容器，数据并没有丢。回到有数据的页面点「☁ 云同步」配好令牌和同步密码，再在主屏幕 App 里点「☁ 云同步」输入同一组令牌密码，数据就全部过来了；不想用云同步，也可以在旧页面「导出备份」、在主屏幕 App 里「导入」。</p>
     </div>
 
     <div id="installViewAndroid" class="install-view">
@@ -438,7 +438,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1595,6 +1595,22 @@ async function setupPWA(){
   theme.name = 'theme-color';
   theme.content = '#5E5CE6';
   document.head.appendChild(theme);
+
+  // iOS Safari 主屏幕 App 专用 meta（全屏、状态栏、桌面标题）——manifest 之外的双保险
+  const appleCapable = document.createElement('meta');
+  appleCapable.name = 'apple-mobile-web-app-capable';
+  appleCapable.content = 'yes';
+  document.head.appendChild(appleCapable);
+
+  const appleTitle = document.createElement('meta');
+  appleTitle.name = 'apple-mobile-web-app-title';
+  appleTitle.content = '灵感收纳盒';
+  document.head.appendChild(appleTitle);
+
+  const appleBar = document.createElement('meta');
+  appleBar.name = 'apple-mobile-web-app-status-bar-style';
+  appleBar.content = 'black';
+  document.head.appendChild(appleBar);
 
   try{
     const reg = await navigator.serviceWorker.register('sw.js');

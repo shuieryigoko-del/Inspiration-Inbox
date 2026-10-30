@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>灵感收纳盒 · Inspiration Inbox</title>
+
+<!-- ============================================================
+     第 0 层：样式层
+     复古未来主义：微圆角 / 柔和阴影 / 毛玻璃 / 日夜双模式（CSS 变量）
+     ============================================================ -->
+<style>
+  /* ---------- 主题变量：日间（银白流线） ---------- */
+  :root{
+    --bg:#F5F5F7;
+    --card:#FFFFFF;
+    --text:#1D1D1F;
+    --text-2:#6E6E73;
+    --accent:#5E5CE6;
+    --accent-soft:rgba(94,92,230,.10);
+    --border:rgba(0,0,0,.06);
+    --shadow:0 4px 20px rgba(0,0,0,.06);
+    --shadow-hover:0 10px 32px rgba(0,0,0,.10);
+    --glass:rgba(255,255,255,.72);
+    --scrim:rgba(245,245,247,.45);
+    --danger:#FF3B30;
+  }
+  /* ---------- 主题变量：夜间（太空曜石） ---------- */
+  [data-theme="dark"]{
+    --bg:#0F0F11;
+    --card:#1C1C1E;
+    --text:#F2F2F7;
+    --text-2:#98989F;
+    --accent:#7D7BFF;
+    --accent-soft:rgba(125,123,255,.16);
+    --border:rgba(255,255,255,.08);
+    --shadow:0 4px 20px rgba(0,0,0,.45);
+    --shadow-hover:0 10px 32px rgba(0,0,0,.6);
+    --glass:rgba(28,28,30,.72);
+    --scrim:rgba(15,15,17,.5);
+    --danger:#FF453A;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    letter-spacing:.5px;
+    line-height:1.65;
+    transition:background .3s ease,color .3s ease;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:80px;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;
+    -webkit-tap-highlight-color:transparent;}
+  textarea,input{font-family:inherit;color:inherit;}
+  /* iOS：输入框字号 ≥16px 规则见各组件原样式（防聚焦时页面自动放大） */
+  /* 触屏设备：按钮留足 44px 触控热区 */
+  @media (pointer:coarse){
+    .icon-btn{width:42px;height:42px;}
+    .text-btn{padding:10px 15px;font-size:14px;}
+    .tab{padding:11px 22px;}
+  }
+  ::placeholder{color:var(--text-2);opacity:.7;}
+
+  /* ---------- 顶部栏（毛玻璃吸顶） ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:40;
+    display:flex;align-items:center;gap:14px;
+    padding:calc(12px + env(safe-area-inset-top)) 22px 12px;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(14px) saturate(1.6);
+    backdrop-filter:blur(14px) saturate(1.6);
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .logo{font-weight:600;font-size:17px;letter-spacing:2px;white-space:nowrap;}
+  .logo small{display:block;font-size:10px;font-weight:400;color:var(--text-2);letter-spacing:1px;}
+  .search-box{
+    flex:1;min-width:180px;max-width:440px;
+    display:flex;align-items:center;gap:8px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:8px 16px;
+    box-shadow:var(--shadow);
+  }
+  .search-box input{flex:1;border:none;outline:none;background:transparent;font-size:14px;}
+  .top-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;}
+  .icon-btn{
+    width:38px;height:38px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:17px;background:var(--card);border:1px solid var(--border);
+    box-shadow:var(--shadow);
+    transition:transform .15s ease,box-shadow .15s ease;
+  }
+  .icon-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-hover);}
+  .text-btn{
+    padding:8px 14px;border-radius:12px;font-size:13px;
+    background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);
+    transition:transform .15s ease,box-shadow .15s ease;white-space:nowrap;
+  }
+  .text-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-hover);}
+  .backup-reminder{font-size:11px;color:var(--text-2);white-space:nowrap;max-width:150px;}
+  .backup-reminder.warn{color:var(--danger);font-weight:600;}
+
+  /* ---------- Tab 栏（三层空间） ---------- */
+  .tabs{display:flex;gap:10px;padding:18px 22px 6px;max-width:1200px;margin:0 auto;width:100%;}
+  .tab{
+    padding:9px 22px;border-radius:999px;font-size:14px;
+    color:var(--text-2);background:var(--card);
+    border:1px solid var(--border);box-shadow:var(--shadow);
+    transition:all .2s ease;
+  }
+  .tab .tab-sub{font-size:10px;opacity:.7;margin-left:6px;letter-spacing:0;}
+  .tab.active{background:var(--accent);color:#fff;border-color:transparent;
+    box-shadow:0 6px 18px var(--accent-soft);}
+
+  /* ---------- 录入区 ---------- */
+  .composer{
+    max-width:760px;margin:14px auto 8px;width:calc(100% - 44px);
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow);padding:18px 20px;
+  }
+  .composer textarea{
+    width:100%;min-height:74px;border:none;outline:none;resize:vertical;
+    background:transparent;font-size:16px;line-height:1.7;
+  }
+  .tag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;}
+  .tag-chip{
+    display:inline-flex;align-items:center;gap:5px;
+    background:var(--accent-soft);color:var(--accent);
+    font-size:12px;padding:3px 10px;border-radius:999px;
+  }
+  .tag-chip button{font-size:13px;line-height:1;color:var(--accent);opacity:.6;}
+  .tag-chip button:hover{opacity:1;}
+  .tag-input{border:none;outline:none;background:transparent;font-size:16px;
+    min-width:120px;flex:1;padding:4px 0;}
+  .composer-tools{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
+  .space-hint{font-size:11px;color:var(--text-2);}
+  .space-hint b{color:var(--accent);}
+  .img-preview{position:relative;width:64px;height:64px;border-radius:12px;overflow:hidden;
+    border:1px solid var(--border);}
+  .img-preview img{width:100%;height:100%;object-fit:cover;display:block;}
+  .img-preview button{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
+    background:rgba(0,0,0,.55);color:#fff;font-size:11px;line-height:18px;text-align:center;}
+  .save-btn{
+    margin-left:auto;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:600;
+    color:#fff;background:linear-gradient(135deg,var(--accent),#8E8CFF);
+    box-shadow:0 6px 18px var(--accent-soft);
+    transition:transform .15s ease,box-shadow .15s ease,opacity .2s;
+  }
+  .save-btn:hover{transform:translateY(-1px);}
+  .save-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+
+  /* ---------- 瀑布流 ---------- */
+  .masonry{
+    max-width:1200px;margin:12px auto 0;width:100%;padding:0 22px;
+    column-count:3;column-gap:16px;
+  }
+  @media (max-width:1024px){.masonry{column-count:2;}}
+  @media (max-width:600px){.masonry{column-count:1;}}
+  .card{
+    break-inside:avoid;display:inline-block;width:100%;
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden;
+    transition:transform .18s ease,box-shadow .18s ease;cursor:pointer;position:relative;
+  }
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);}
+  .card img.card-img{width:100%;display:block;}
+  .card-body{padding:13px 15px 14px;}
+  .card-content{font-size:14px;white-space:pre-wrap;word-break:break-word;}
+  .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
+  .card-tag{font-size:11px;color:var(--accent);background:var(--accent-soft);
+    padding:2px 9px;border-radius:999px;}
+  .card-meta{display:flex;justify-content:space-between;align-items:center;
+    margin-top:10px;font-size:11px;color:var(--text-2);}
+  .card-del{
+    position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;
+    background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    color:var(--text-2);font-size:14px;line-height:26px;text-align:center;
+    opacity:0;transition:opacity .15s;
+  }
+  .card:hover .card-del{opacity:1;}
+  @media (hover:none){.card-del{opacity:.75;}}
+  .card-del:hover{color:var(--danger);}
+  .empty{
+    text-align:center;color:var(--text-2);font-size:14px;
+    padding:80px 20px;column-span:all;width:100%;
+  }
+
+  /* ---------- 抽屉详情 ---------- */
+  .scrim{
+    position:fixed;inset:0;background:var(--scrim);
+    opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:45;
+  }
+  .scrim.open{opacity:1;}
+  .drawer{
+    position:fixed;top:0;right:0;height:100vh;width:40%;min-width:340px;max-width:580px;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(20px) saturate(1.5);
+    backdrop-filter:blur(20px) saturate(1.5);
+    border-left:1px solid var(--border);
+    border-radius:18px 0 0 18px;
+    box-shadow:-12px 0 50px rgba(0,0,0,.12);
+    transform:translateX(105%);transition:transform .32s cubic-bezier(.22,.9,.3,1);
+    z-index:50;display:flex;flex-direction:column;
+  }
+  .drawer.open{transform:translateX(0);}
+  .drawer-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
+  .drawer-title{font-size:13px;color:var(--text-2);flex:1;letter-spacing:1px;}
+  .drawer-body{flex:1;overflow-y:auto;padding:20px 22px 40px;}
+  .drawer-body img{width:100%;border-radius:14px;margin-bottom:16px;display:block;}
+  .drawer-content{font-size:16px;line-height:1.9;white-space:pre-wrap;word-break:break-word;}
+  .drawer-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px;}
+  .drawer-time{margin-top:22px;font-size:12px;color:var(--text-2);}
+
+  /* 手机端：抽屉从底部滑出，占屏 60% */
+  @media (max-width:768px){
+    .drawer{
+      top:auto;bottom:0;left:0;right:0;width:100%;max-width:none;height:62vh;min-width:0;
+      border-radius:22px 22px 0 0;border-left:none;
+      border-top:1px solid var(--border);
+      transform:translateY(105%);
+    }
+    .drawer.open{transform:translateY(0);}
+  }
+
+  /* ---------- 云同步设置弹窗 ---------- */
+  .modal-mask{
+    position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:80;
+    display:none;align-items:center;justify-content:center;padding:22px;
+  }
+  .modal-mask.open{display:flex;}
+  .sync-card{
+    width:100%;max-width:430px;max-height:88vh;overflow-y:auto;
+    background:var(--card);border:1px solid var(--border);border-radius:18px;
+    box-shadow:var(--shadow-hover);padding:24px;
+  }
+  .sync-card h3{font-size:16px;font-weight:600;margin-bottom:6px;}
+  .sync-card .hint{font-size:12px;color:var(--text-2);line-height:1.7;margin-bottom:14px;}
+  .sync-card label{display:block;font-size:12px;color:var(--text-2);margin:14px 0 5px;}
+  .sync-card input{
+    width:100%;padding:11px 13px;border-radius:12px;font-size:16px;
+    border:1px solid var(--border);background:var(--bg);color:var(--text);outline:none;
+  }
+  .sync-card input:focus{border-color:var(--accent);}
+  .sync-link{display:inline-block;margin-top:6px;font-size:12px;color:var(--accent);word-break:break-all;}
+  .sync-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;align-items:center;}
+  .sync-actions .save-btn{margin-left:0;padding:10px 22px;}
+  #syncStatusLine{font-size:12px;color:var(--text-2);margin-top:14px;min-height:18px;line-height:1.6;word-break:break-all;}
+  #syncStatusLine.err{color:var(--danger);}
+  #syncStatusLine.ok{color:#34C759;}
+  .sync-status-view{display:none;}
+  .sync-status-view.show{display:block;}
+  .sync-setup-view.hidden{display:none;}
+
+  /* ---------- 安装指引弹窗 ---------- */
+  .install-view{display:none;}
+  .install-view.show{display:block;}
+  .install-steps{padding-left:20px;margin:8px 0 12px;}
+  .install-steps li{font-size:13px;line-height:1.85;color:var(--text);margin-bottom:7px;}
+
+  /* ---------- Toast 轻提示 ---------- */
+  .toast{
+    position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);
+    background:var(--text);color:var(--bg);
+    padding:10px 22px;border-radius:999px;font-size:13px;
+    opacity:0;pointer-events:none;transition:all .3s ease;z-index:99;
+    box-shadow:0 8px 30px rgba(0,0,0,.2);max-width:88vw;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .backup-reminder-mini{display:none;}
+  /* 手机端细节：窄屏下顶栏自动换行不溢出；底部留出手势条安全区 */
+  @media (max-width:600px){
+    .topbar{padding-left:14px;padding-right:14px;gap:10px;}
+    .logo{font-size:15px;}
+    .search-box input{font-size:16px;}
+    .search-box{order:3;flex-basis:100%;max-width:none;}
+    .backup-reminder{display:none;}
+    .backup-reminder-mini{display:inline;font-size:11px;color:var(--text-2);margin-left:auto;}
+    .backup-reminder-mini.warn{color:var(--danger);font-weight:600;}
+    .save-btn{margin-left:0;}
+    .tabs{padding:14px 14px 4px;}
+    .masonry{padding:0 14px;}
+    .composer{width:calc(100% - 28px);}
+    body{padding-bottom:calc(40px + env(safe-area-inset-bottom));}
+  }
+  /* 独立 PWA 窗口里给顶部状态栏留出主题色背景 */
+  @media (display-mode:standalone){
+    .topbar{padding-top:calc(10px + env(safe-area-inset-top));}
+  }
+</style>
+</head>
+<body>
+
+<!-- ====================== 页面骨架 ====================== -->
+<header class="topbar">
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.3.2</small></div>
+  <div class="search-box">
+    <span>🔍</span>
+    <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
+  </div>
+  <div class="top-actions">
+    <span id="backupReminder" class="backup-reminder"></span>
+    <button id="installBtn" class="text-btn" style="display:none" title="把应用安装到桌面/主屏幕">📲 安装 App</button>
+    <button id="syncBtn" class="text-btn" title="三端云同步（GitHub Gist 加密）">☁ 云同步</button>
+    <button id="backupDirBtn" class="text-btn" style="display:none" title="授权后自动备份将静默覆盖写入该文件夹">授权备份文件夹</button>
+    <button id="exportBtn" class="text-btn">导出备份</button>
+    <button id="importBtn" class="text-btn">导入</button>
+    <button id="themeBtn" class="icon-btn" title="日/夜模式">🌙</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab" data-space="cold">冷库<span class="tab-sub">Cold</span></button>
+  <button class="tab active" data-space="workspace">工作台<span class="tab-sub">Workspace</span></button>
+  <button class="tab" data-space="core">内核<span class="tab-sub">Core</span></button>
+</nav>
+
+<section class="composer">
+  <textarea id="contentInput" placeholder="封存此刻的灵感…（也可以直接 Ctrl+V 粘贴图片）"></textarea>
+  <div class="tag-chips" id="tagChips"></div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <input id="tagInput" class="tag-input" placeholder="输入标签后回车，如：科幻 / 色彩 / 待用">
+  </div>
+  <div class="composer-tools">
+    <button id="imageBtn" class="icon-btn" title="上传图片" style="width:36px;height:36px;">🖼️</button>
+    <input id="imageInput" type="file" accept="image/*" hidden>
+    <div id="imgPreview" class="img-preview" style="display:none;">
+      <img alt="待封存图片">
+      <button id="imgRemoveBtn" title="移除图片">×</button>
+    </div>
+    <span class="space-hint">将封存至：<b id="spaceHint">工作台</b></span>
+    <span id="backupReminderMini" class="backup-reminder-mini"></span>
+    <button id="saveBtn" class="save-btn" disabled>封存碎片</button>
+  </div>
+</section>
+
+<main id="masonry" class="masonry"></main>
+
+<!-- 抽屉（无全黑遮罩，背景瀑布流保持可滚动） -->
+<div id="scrim" class="scrim"></div>
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="drawer-title">碎片详情 · FRAGMENT</span>
+    <button id="drawerClose" class="icon-btn" style="width:34px;height:34px;">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<!-- 云同步设置弹窗 -->
+<div id="syncModal" class="modal-mask">
+  <div class="sync-card">
+    <h3>☁ 三端云同步</h3>
+
+    <!-- 未配置视图 -->
+    <div id="syncSetupView" class="sync-setup-view">
+      <p class="hint">数据会用你的同步密码 AES 加密后上传到你自己的 GitHub 秘密 Gist，GitHub 上看到的是乱码。三端使用同一组令牌和密码。令牌仅勾选 gist 权限，可随时在 GitHub 吊销。</p>
+      <label>GitHub 访问令牌（ghp_ 开头）</label>
+      <input id="syncTokenInput" type="password" autocomplete="off" placeholder="粘贴令牌">
+      <a class="sync-link" href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Inspiration-Inbox" target="_blank" rel="noopener">点此生成令牌（页面会自动勾好 gist 权限）→</a>
+      <label>同步密码（三端一致，遗忘后云端数据无法解开）</label>
+      <input id="syncPwdInput" type="password" autocomplete="off" placeholder="设置一个同步密码">
+      <div class="sync-actions">
+        <button id="syncSaveBtn" class="save-btn">保存并立即同步</button>
+        <button id="syncSetupCloseBtn" class="text-btn">取消</button>
+      </div>
+    </div>
+
+    <!-- 已配置视图 -->
+    <div id="syncStatusView" class="sync-status-view">
+      <p class="hint">同步已开启。新增、删除会在联网几秒后自动同步；也可随时点下方按钮立即同步。</p>
+      <p class="hint" id="syncLastLine">尚未同步过</p>
+      <div class="sync-actions">
+        <button id="syncNowBtn" class="save-btn">立即同步</button>
+        <button id="syncUnlinkBtn" class="text-btn">取消本机同步配置</button>
+        <button id="syncStatusCloseBtn" class="text-btn">关闭</button>
+      </div>
+    </div>
+
+    <p id="syncStatusLine"></p>
+  </div>
+</div>
+
+<!-- 安装指引弹窗（iOS 只能手动添加；安卓兜底手动菜单） -->
+<div id="installModal" class="modal-mask">
+  <div class="sync-card">
+    <h3>📲 安装到主屏幕</h3>
+
+    <div id="installViewIos" class="install-view">
+      <p class="hint">iPhone / iPad 上只有系统自带的 <b>Safari 浏览器</b>能把网页装成全屏独立 App，Edge、Chrome 的菜单里都没有这个选项（苹果的系统限制）。</p>
+      <ol class="install-steps">
+        <li>如果你现在在 Edge 里：先复制地址栏里的网址。</li>
+        <li>打开 Safari（蓝底、白色指南针图标），粘贴网址打开本应用。</li>
+        <li>点地址栏旁边的「分享」图标（一个方框、中间有向上箭头；iPad 在右上角，iPhone 在底部）。</li>
+        <li>在分享菜单里往下滑，点「添加到主屏幕」；如果出现「以网页 App 方式打开」开关，请把它打开。</li>
+        <li>点右上角「添加」，主屏幕就会出现紫底白「灵」字的图标。</li>
+      </ol>
+      <p class="hint">⚠️ 主屏幕 App 第一次打开时里面可能是空的——iOS 规定它与 Safari 标签页（以及 Edge）各自是独立的数据容器，数据并没有丢。回到有数据的页面点「☁ 云同步」配好令牌和同步密码，再在主屏幕 App 里点「☁ 云同步」输入同一组令牌密码，数据就全部过来了；不想用云同步，也可以在旧页面「导出备份」、在主屏幕 App 里「导入」。</p>
+    </div>
+
+    <div id="installViewAndroid" class="install-view">
+      <p class="hint">安装弹窗没有自动出现时，可以用浏览器菜单手动添加：</p>
+      <ol class="install-steps">
+        <li><b>华为浏览器：</b>点底部菜单（四个点）→「添加至主屏幕」；若菜单里有「安装应用」，优先点它（装好后全屏、没有地址栏）。</li>
+        <li><b>出境易里的 Edge：</b>点菜单「⋯」→「添加到手机」。如果这一项是灰色：到系统「设置 → 应用和服务 → 应用管理 → 出境易 → 权限」里允许「创建桌面快捷方式」，再回来重试。</li>
+        <li><b>其他浏览器：</b>菜单「⋮」→「安装应用」或「添加到主屏幕」。</li>
+      </ol>
+      <p class="hint">请直接在浏览器里打开本网页再操作，不要从桌面旧图标点进来；装好新图标后，旧的书签式图标（顶部带地址栏的那个）可以删掉。</p>
+    </div>
+
+    <div class="sync-actions">
+      <button id="installCloseBtn" class="save-btn">我知道了</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<input id="importInput" type="file" accept=".json,application/json" hidden>
+
+<script>
+/* ============================================================
+ * 灵感收纳盒 V1.0  —— 单文件 HTML（原生 JS，零外部依赖）
+ * 代码六层结构：
+ *   第 1 层 常量与工具层 utils
+ *   第 2 层 数据操作层 db（全项目只有这一层碰 IndexedDB）
+ *   第 3 层 状态层 state
+ *   第 4 层 UI 渲染层 render
+ *   第 5 层 事件监听层 events
+ *   第 6 层 启动入口 init
+ * 安全铁律：所有用户文本一律用 textContent 渲染，严禁 innerHTML
+ * ============================================================ */
+
+/* ============================================================
+ * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
+ * ============================================================ */
+const APP_VERSION = '1.3.2';
+const DB_NAME = 'inspiration-inbox';
+const DB_VERSION = 1;
+const STORE_FRAGMENTS = 'fragments';
+const STORE_SETTINGS = 'settings';
+const SPACE_NAMES = { cold:'冷库', workspace:'工作台', core:'内核' };
+
+const utils = {
+  // 主键：毫秒时间戳 + 随机数，避免同毫秒封存撞 id
+  uid(){ return Date.now() + Math.floor(Math.random()*100000); },
+
+  // 简单字符串 hash（djb2），仅用于"数据是否变化"的比对
+  hash(str){
+    let h = 5381;
+    for(let i=0;i<str.length;i++){ h = ((h<<5)+h + str.charCodeAt(i)) >>> 0; }
+    return h.toString(16);
+  },
+
+  // 数据指纹：按 id 排序后序列化，保证顺序不影响比对结果
+  fingerprint(items){
+    const sorted = [...items].sort((a,b)=>a.id-b.id);
+    return utils.hash(JSON.stringify(sorted.map(x=>({
+      id:x.id, space:x.space, type:x.type, content:x.content,
+      tags:x.tags, image:x.image, parentId:x.parentId,
+      audioUrl:x.audioUrl, coverImg:x.coverImg, comments:x.comments
+    }))));
+  },
+
+  // Canvas 压缩图片为 Base64（最长边 1280，JPEG 0.82），防止 IndexedDB 被大图撑爆
+  compressImage(file){
+    return new Promise((resolve,reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const MAX = 1280;
+          let { width:w, height:h } = img;
+          if(w>MAX || h>MAX){
+            const scale = Math.min(MAX/w, MAX/h);
+            w = Math.round(w*scale); h = Math.round(h*scale);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          resolve(canvas.toDataURL('image/jpeg',0.82));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  },
+
+  // 触发浏览器下载
+  download(filename, content, mime='application/json'){
+    const blob = new Blob([content], {type:mime+';charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  },
+
+  dateStr(ts=new Date().getTime()){
+    const d = new Date(ts), p = n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  },
+
+  formatTime(ts){
+    const d = new Date(ts);
+    const p = n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  },
+
+  // 标签解析：以空格 / 逗号分隔，自动补 #
+  parseTags(raw){
+    return raw.split(/[\s,，、]+/).map(t=>t.replace(/^#+/,'').trim()).filter(Boolean);
+  },
+
+  debounce(fn, ms=250){
+    let timer;
+    return (...args)=>{ clearTimeout(timer); timer=setTimeout(()=>fn(...args),ms); };
+  },
+
+  // iOS/iPadOS 检测（分享导出策略不同；含 Apple Silicon iPad 伪装成 Mac 的情况）
+  get isIOS(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  },
+
+  // 触屏设备检测（用于隐藏只有桌面 Chromium 才支持的文件夹授权）
+  get isTouch(){
+    return window.matchMedia('(pointer: coarse)').matches;
+  }
+};
+
+/* ============================================================
+ * 第 2 层：数据操作层（全项目唯一允许操作 IndexedDB 的地方）
+ * 两张表：
+ *   fragments —— 碎片素材（keyPath: id），索引 space / parentId / createdAt
+ *   settings  —— 键值设置（keyPath: key），存主题、备份指纹、文件夹句柄等
+ * ============================================================ */
+const db = {
+  _db:null,
+
+  open(){
+    return new Promise((resolve,reject)=>{
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e)=>{
+        const d = e.target.result;
+        if(!d.objectStoreNames.contains(STORE_FRAGMENTS)){
+          const store = d.createObjectStore(STORE_FRAGMENTS, { keyPath:'id' });
+          store.createIndex('space','space',{unique:false});
+          store.createIndex('parentId','parentId',{unique:false});
+          store.createIndex('createdAt','createdAt',{unique:false});
+        }
+        if(!d.objectStoreNames.contains(STORE_SETTINGS)){
+          d.createObjectStore(STORE_SETTINGS, { keyPath:'key' });
+        }
+      };
+      req.onsuccess = ()=>{ this._db = req.result; resolve(this._db); };
+      req.onerror = ()=>reject(req.error);
+    });
+  },
+
+  _tx(storeName, mode){
+    return this._db.transaction(storeName, mode).objectStore(storeName);
+  },
+
+  addItem(item){
+    return new Promise((resolve,reject)=>{
+      const req = this._tx(STORE_FRAGMENTS,'readwrite').add(item);
+      req.onsuccess=()=>resolve(item); req.onerror=()=>reject(req.error);
+    });
+  },
+
+  getAll(){
+    return new Promise((resolve,reject)=>{
+      const req = this._tx(STORE_FRAGMENTS,'readonly').getAll();
+      req.onsuccess=()=>resolve(req.result||[]); req.onerror=()=>reject(req.error);
+    });
+  },
+
+  deleteItem(id){
+    return new Promise((resolve,reject)=>{
+      const req = this._tx(STORE_FRAGMENTS,'readwrite').delete(id);
+      req.onsuccess=()=>resolve(); req.onerror=()=>reject(req.error);
+    });
+  },
+
+  // 导入：确认后整库替换（JSON 本身就是备份，恢复后无需再次备份）
+  replaceAll(items){
+    return new Promise((resolve,reject)=>{
+      const tx = this._db.transaction(STORE_FRAGMENTS,'readwrite');
+      const store = tx.objectStore(STORE_FRAGMENTS);
+      store.clear();
+      items.forEach(x=>store.put(x));
+      tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
+    });
+  },
+
+  getSetting(key){
+    return new Promise((resolve)=>{
+      const req = this._tx(STORE_SETTINGS,'readonly').get(key);
+      req.onsuccess=()=>resolve(req.result ? req.result.value : undefined);
+      req.onerror=()=>resolve(undefined);
+    });
+  },
+
+  setSetting(key, value){
+    return new Promise((resolve,reject)=>{
+      const req = this._tx(STORE_SETTINGS,'readwrite').put({key,value});
+      req.onsuccess=()=>resolve(); req.onerror=()=>reject(req.error);
+    });
+  }
+};
+
+/* ============================================================
+ * 第 3 层：状态层（界面当前处于什么状态；渲染只认它）
+ * ============================================================ */
+const state = {
+  items: [],
+  currentSpace: 'workspace',
+  search: '',
+  theme: 'light',
+  pendingImage: null,      // 录入区待封存的图片 Base64
+  pendingTags: [],        // 录入区已添加的标签
+  drawerId: null          // 当前抽屉中的碎片 id；null = 关闭
+};
+
+/* ============================================================
+ * 第 4 层：UI 渲染层（只负责"画"，不直接改数据库）
+ * ============================================================ */
+const $ = sel => document.querySelector(sel);
+
+const render = {
+  // 总入口：数据/状态变化后调用
+  all(){
+    this.cards();
+    this.backupReminder();
+    this.saveButton();
+  },
+
+  visibleItems(){
+    const kw = state.search.trim().toLowerCase();
+    return state.items
+      .filter(x=>x.space === state.currentSpace)
+      .filter(x=>!kw
+        || (x.content||'').toLowerCase().includes(kw)
+        || (x.tags||[]).some(t=>t.toLowerCase().includes(kw)))
+      .sort((a,b)=>b.createdAt-a.createdAt);
+  },
+
+  cards(){
+    const box = $('#masonry');
+    box.textContent = '';
+    const list = this.visibleItems();
+    if(!list.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = state.search
+        ? '没有命中的碎片，换个关键词试试。'
+        : `「${SPACE_NAMES[state.currentSpace]}」还是空的，封存第一块碎片吧。`;
+      box.appendChild(empty);
+      return;
+    }
+    list.forEach(item=>box.appendChild(this.card(item)));
+  },
+
+  // 单张卡片（全部用 createElement + textContent，杜绝 XSS）
+  card(item){
+    const card = document.createElement('article');
+    card.className = 'card';
+    card.dataset.id = item.id;
+
+    if(item.image){
+      const img = document.createElement('img');
+      img.className = 'card-img';
+      img.src = item.image;
+      img.alt = '';
+      img.loading = 'lazy';
+      card.appendChild(img);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const content = document.createElement('div');
+    content.className = 'card-content';
+    content.textContent = item.content;
+    body.appendChild(content);
+
+    if(item.tags && item.tags.length){
+      const tags = document.createElement('div');
+      tags.className = 'card-tags';
+      item.tags.forEach(t=>{
+        const tag = document.createElement('span');
+        tag.className = 'card-tag';
+        tag.textContent = '#'+t;
+        tags.appendChild(tag);
+      });
+      body.appendChild(tags);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'card-meta';
+    const time = document.createElement('span');
+    time.textContent = utils.formatTime(item.createdAt);
+    meta.appendChild(time);
+    body.appendChild(meta);
+    card.appendChild(body);
+
+    const del = document.createElement('button');
+    del.className = 'card-del';
+    del.textContent = '✕';
+    del.title = '删除该碎片';
+    del.dataset.action = 'delete';
+    card.appendChild(del);
+
+    return card;
+  },
+
+  // 抽屉详情
+  drawer(item){
+    const body = $('#drawerBody');
+    body.textContent = '';
+    if(item.image){
+      const img = document.createElement('img');
+      img.src = item.image; img.alt='';
+      body.appendChild(img);
+    }
+    const content = document.createElement('div');
+    content.className = 'drawer-content';
+    content.textContent = item.content;
+    body.appendChild(content);
+
+    if(item.tags && item.tags.length){
+      const tags = document.createElement('div');
+      tags.className = 'drawer-tags';
+      item.tags.forEach(t=>{
+        const tag = document.createElement('span');
+        tag.className = 'card-tag';
+        tag.textContent = '#'+t;
+        tags.appendChild(tag);
+      });
+      body.appendChild(tags);
+    }
+
+    const time = document.createElement('div');
+    time.className = 'drawer-time';
+    time.textContent = `封存于 ${utils.formatTime(item.createdAt)} · 位于「${SPACE_NAMES[item.space]}」`;
+    body.appendChild(time);
+  },
+
+  openDrawer(id){
+    const item = state.items.find(x=>x.id===id);
+    if(!item) return;
+    state.drawerId = id;
+    this.drawer(item);
+    $('#drawer').classList.add('open');
+    $('#scrim').classList.add('open');
+    $('#drawer').setAttribute('aria-hidden','false');
+  },
+
+  closeDrawer(){
+    state.drawerId = null;
+    $('#drawer').classList.remove('open');
+    $('#scrim').classList.remove('open');
+    $('#drawer').setAttribute('aria-hidden','true');
+  },
+
+  theme(){
+    document.documentElement.dataset.theme = state.theme;
+    $('#themeBtn').textContent = state.theme==='dark' ? '☀️' : '🌙';
+  },
+
+  tabs(){
+    document.querySelectorAll('.tab').forEach(tab=>{
+      tab.classList.toggle('active', tab.dataset.space===state.currentSpace);
+    });
+    $('#spaceHint').textContent = SPACE_NAMES[state.currentSpace];
+  },
+
+  // 标签 chips
+  tagChips(){
+    const box = $('#tagChips');
+    box.textContent = '';
+    state.pendingTags.forEach((t,i)=>{
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      const txt = document.createElement('span');
+      txt.textContent = '#'+t;
+      const rm = document.createElement('button');
+      rm.textContent='×'; rm.type='button';
+      rm.addEventListener('click',()=>{ state.pendingTags.splice(i,1); this.tagChips(); this.saveButton(); });
+      chip.append(txt,rm);
+      box.appendChild(chip);
+    });
+  },
+
+  imagePreview(){
+    const box = $('#imgPreview');
+    if(state.pendingImage){
+      box.style.display='block';
+      box.querySelector('img').src = state.pendingImage;
+    }else{
+      box.style.display='none';
+      box.querySelector('img').src='';
+      $('#imageInput').value='';
+    }
+  },
+
+  saveButton(){
+    const hasContent = $('#contentInput').value.trim().length>0 || !!state.pendingImage;
+    $('#saveBtn').disabled = !hasContent;
+  },
+
+  // "距上次导出 X 天"提醒（>3 天变红）；顶栏与手机端录入区两处同步
+  async backupReminder(){
+    const last = await db.getSetting('lastExportAt');
+    let text, warn;
+    if(!last){ text='⚠ 尚未备份，记得点导出'; warn=true; }
+    else{
+      const days = Math.floor((Date.now()-last)/86400000);
+      text = days<=0 ? '✓ 今天已备份' : `上次备份：${days} 天前`;
+      warn = days>3;
+    }
+    ['#backupReminder','#backupReminderMini'].forEach(sel=>{
+      const el = $(sel);
+      if(!el) return;
+      el.textContent = text;
+      el.classList.toggle('warn', warn);
+    });
+  },
+
+  // 仅桌面 Chromium（鼠标指针 + API 齐全）才显示"授权备份文件夹"
+  backupDirButton(){
+    const supported = 'showDirectoryPicker' in window
+      && window.matchMedia('(pointer: fine)').matches;
+    const btn = $('#backupDirBtn');
+    btn.style.display = supported ? '' : 'none';
+  }
+};
+
+/* ============================================================
+ * 备份模块：变更检测去重 + 文件夹静默覆盖 / 普通下载降级
+ * ============================================================ */
+const backup = {
+  buildPayload(items){
+    return {
+      app:'inspiration-inbox',
+      version:1,
+      exportedAt:Date.now(),
+      fragments:items
+    };
+  },
+
+  // manual=true 时强制执行（手动点导出）；封存后自动调用时先比对指纹
+  // 返回值：unchanged / dir / shared / download / skipped(ios 自动模式) / cancelled(用户取消分享)
+  async run(manual=false){
+    const items = state.items;
+    const fingerprint = utils.fingerprint(items);
+    if(!manual && fingerprint === await db.getSetting('lastBackupHash')){
+      return 'unchanged'; // 数据没有任何变化，不产生重复备份
+    }
+    const json = JSON.stringify(this.buildPayload(items), null, 2);
+
+    // iOS 自动备份不弹系统分享（太打扰），也不触发可能失效的静默下载：
+    // 交给顶部"X 天未备份"提醒，由用户手动点「导出备份」走分享面板
+    if(!manual && utils.isIOS && !(await db.getSetting('backupDirHandle'))){
+      return 'skipped';
+    }
+
+    const mode = await this._deliver(json, manual);
+    if(mode === 'cancelled') return 'cancelled';
+
+    await db.setSetting('lastBackupHash', fingerprint);
+    await db.setSetting('lastExportAt', Date.now());
+    render.backupReminder();
+    return mode;
+  },
+
+  // 选择交付方式：授权文件夹 → 手动分享面板 → 普通下载
+  async _deliver(json, manual){
+    // 1) 电脑 Chrome/Edge：已授权文件夹则静默覆盖写入 latest.json
+    const handle = await db.getSetting('backupDirHandle');
+    if(handle){
+      try{
+        let perm = await handle.queryPermission({mode:'readwrite'});
+        if(perm !== 'granted') perm = await handle.requestPermission({mode:'readwrite'});
+        if(perm === 'granted'){
+          await this._writeToDir(handle, 'inspiration-backup-latest.json', json);
+          // 每 7 天额外归档一份带日期的，防最新文件被误覆盖
+          const lastArchive = await db.getSetting('lastArchiveAt');
+          if(!lastArchive || Date.now()-lastArchive > 7*86400000){
+            await this._writeToDir(handle, `inspiration-backup-${utils.dateStr()}.json`, json);
+            await db.setSetting('lastArchiveAt', Date.now());
+          }
+          return 'dir';
+        }
+      }catch(err){
+        console.warn('文件夹备份失败，降级处理：', err);
+      }
+    }
+
+    // 2) 手动导出 + 系统支持分享文件 → 调系统分享面板
+    //    iPad/iPhone：存储到"文件"、微信、隔空投送；安卓：保存到下载/微信等
+    if(manual && (utils.isIOS || utils.isTouch) && navigator.canShare){
+      try{
+        const file = new File([json], 'inspiration-backup-latest.json', {type:'application/json'});
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({files:[file], title:'灵感收纳盒 · 数据备份'});
+          return 'shared';
+        }
+      }catch(err){
+        if(err && err.name === 'AbortError') return 'cancelled'; // 用户主动取消
+        console.warn('系统分享失败，降级为下载：', err);
+      }
+    }
+
+    // 3) 兜底：普通下载（安卓 Chrome/桌面浏览器静默进下载目录）
+    utils.download('inspiration-backup-latest.json', json);
+    return 'download';
+  },
+
+  async _writeToDir(dirHandle, filename, content){
+    const fileHandle = await dirHandle.getFileHandle(filename, {create:true});
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+  },
+
+  // 首次授权（必须由用户点击触发）
+  async setupDir(){
+    if(!('showDirectoryPicker' in window)) return;
+    try{
+      const handle = await window.showDirectoryPicker({ mode:'readwrite' });
+      await db.setSetting('backupDirHandle', handle);
+      $('#backupDirBtn').textContent = '✓ 备份文件夹已连接';
+      toast('已连接，之后将静默覆盖备份到该文件夹');
+    }catch(e){ /* 用户取消，什么都不做 */ }
+  }
+};
+
+/* ============================================================
+ * 第 2B 层：云同步服务 cloudSync（本地优先，可选开启）
+ * 通道：GitHub Gist（秘密，不公开）；加密：PBKDF2 派生 + AES-GCM 256
+ * 合并：碎片按 id 去重、updatedAt 最新者胜出；删除用墓碑（30 天）同步
+ * 数据仍以本机 IndexedDB 为准，断网照常记录，联网后自动补同步
+ * ============================================================ */
+const GIST_API = 'https://api.github.com';
+const GIST_FILENAME = 'inspiration-inbox-sync.json';
+const PBKDF2_ITER = 150000;
+
+const cloudSync = {
+  busy:false,
+  _timer:null,
+
+  // ---------- 基础工具 ----------
+  _enc:new TextEncoder(),
+  _dec:new TextDecoder(),
+  _b64(buf){
+    const bytes = new Uint8Array(buf);
+    let s='';
+    for(let i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  },
+  _unb64(b64){
+    const s = atob(b64);
+    const u = new Uint8Array(s.length);
+    for(let i=0;i<s.length;i++) u[i] = s.charCodeAt(i);
+    return u;
+  },
+
+  async _deriveKey(password, saltBuf){
+    const base = await crypto.subtle.importKey(
+      'raw', this._enc.encode(password), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt:saltBuf, iterations:PBKDF2_ITER, hash:'SHA-256' },
+      base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+    );
+  },
+
+  async encrypt(obj, password, saltB64){
+    const salt = saltB64 ? this._unb64(saltB64) : crypto.getRandomValues(new Uint8Array(16));
+    const key = await this._deriveKey(password, salt);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, this._enc.encode(JSON.stringify(obj)));
+    return { v:1, salt:this._b64(salt.buffer), iv:this._b64(iv.buffer), ct:this._b64(ct) };
+  },
+
+  async decrypt(env, password){
+    const key = await this._deriveKey(password, this._unb64(env.salt));
+    const plain = await crypto.subtle.decrypt(
+      {name:'AES-GCM', iv:this._unb64(env.iv)}, key, this._unb64(env.ct)
+    );
+    return JSON.parse(this._dec.decode(plain));
+  },
+
+  // ---------- Gist API ----------
+  async _api(path, token, opts={}){
+    const res = await fetch(GIST_API + path, Object.assign({
+      headers:{
+        'Accept':'application/vnd.github+json',
+        'Authorization':'Bearer ' + token,
+        'X-GitHub-Api-Version':'2022-11-28',
+        'Content-Type':'application/json'
+      }
+    }, opts));
+    if(!res.ok){
+      const detail = await res.text().catch(()=> '');
+      throw new Error('HTTP ' + res.status + ' ' + detail.slice(0,150));
+    }
+    return res.status === 204 ? null : res.json();
+  },
+
+  // 在用户的 gist 列表中自动发现同步文件（第二台设备无需手动填 id）
+  async _findGist(token){
+    for(let page=1; page<=3; page++){
+      const list = await this._api('/gists?per_page=100&page='+page, token);
+      if(!list.length) break;
+      const hit = list.find(g => g.files && g.files[GIST_FILENAME]);
+      if(hit) return hit.id;
+    }
+    return null;
+  },
+
+  async _readGistContent(gist){
+    const file = gist.files && gist.files[GIST_FILENAME];
+    if(!file) return '';
+    if(!file.truncated) return file.content || '';
+    // 超大文件走 raw_url 拉取
+    const res = await fetch(file.raw_url);
+    if(!res.ok) throw new Error('云端文件过大且拉取失败 HTTP '+res.status);
+    return res.text();
+  },
+
+  // ---------- 合并算法（纯函数，便于自测）----------
+  _pruneTombs(tombs, now=Date.now()){
+    const map = new Map();
+    tombs.forEach(t=>{
+      const id = typeof t === 'object' ? t.id : t;
+      const at = typeof t === 'object' ? t.at : now;
+      if(now - at < 30*86400000 && !map.has(id)) map.set(id, {id, at});
+    });
+    return [...map.values()];
+  },
+
+  _merge(localItems, localTombs, remote){
+    const byId = new Map();
+    const stamp = x => x.updatedAt || x.createdAt || 0;
+    [...localItems, ...((remote && remote.fragments) || [])].forEach(x=>{
+      if(!x || typeof x.id !== 'number') return;
+      const old = byId.get(x.id);
+      if(!old || stamp(x) >= stamp(old)) byId.set(x.id, x);
+    });
+    const tombs = this._pruneTombs([...localTombs, ...((remote && remote.deletedIds) || [])]);
+    const dead = new Set(tombs.map(t=>t.id));
+    return { fragments:[...byId.values()].filter(x=>!dead.has(x.id)), tombstones:tombs };
+  },
+
+  // ---------- 同步主流程：拉取 → 合并 → 推送 ----------
+  async sync({manual=false}={}){
+    const token = await db.getSetting('syncToken');
+    const password = await db.getSetting('syncPassword');
+    if(!token || !password) return 'unconfigured';
+    if(this.busy) return 'busy';
+
+    this.busy = true;
+    this._uiBusy(true);
+    try{
+      let gistId = await db.getSetting('syncGistId');
+      if(!gistId) gistId = await this._findGist(token);
+
+      let remotePlain = null;
+      let remoteSalt = null;
+      if(gistId){
+        const gist = await this._api('/gists/'+gistId, token);
+        if(!gist.files || !gist.files[GIST_FILENAME]){ gistId = null; }
+        else{
+          const raw = await this._readGistContent(gist);
+          if(raw.trim()){
+            try{
+              const env = JSON.parse(raw);
+              remoteSalt = env.salt || null;
+              remotePlain = await this.decrypt(env, password);
+            }catch(err){
+              throw new Error('云端数据解密失败：同步密码是否正确？');
+            }
+          }
+        }
+      }
+
+      const localItems = await db.getAll();
+      const localTombs = (await db.getSetting('tombstones')) || [];
+      const merged = this._merge(localItems, localTombs, remotePlain);
+      await db.replaceAll(merged.fragments);
+      await db.setSetting('tombstones', merged.tombstones);
+      state.items = merged.fragments;
+
+      // 盐以云端信封为准（保证三端同密码→同密钥）；首次上传则沿用本机盐或新生成
+      const useSalt = remoteSalt
+        || await db.getSetting('syncSalt')
+        || this._b64(crypto.getRandomValues(new Uint8Array(16)).buffer);
+      const payload = {
+        app:'inspiration-inbox', kind:'sync', version:1,
+        updatedAt:Date.now(), fragments:merged.fragments, deletedIds:merged.tombstones
+      };
+      const env = await this.encrypt(payload, password, useSalt);
+      const body = {
+        description:'Inspiration Inbox sync (encrypted)',
+        public:false,
+        files:{ [GIST_FILENAME]:{ content:JSON.stringify(env) } }
+      };
+      if(gistId){
+        await this._api('/gists/'+gistId, token, {method:'PATCH', body:JSON.stringify(body)});
+      }else{
+        const created = await this._api('/gists', token, {method:'POST', body:JSON.stringify(body)});
+        gistId = created.id;
+      }
+
+      await db.setSetting('syncGistId', gistId);
+      await db.setSetting('syncSalt', useSalt);
+      await db.setSetting('lastSyncAt', Date.now());
+
+      render.all();
+      renderSyncUI();
+      if(manual) toast('☁ 同步完成');
+      return 'ok';
+    }catch(err){
+      console.warn('云同步失败：', err);
+      const msg = /解密失败/.test(err.message) ? err.message
+        : /401|403/.test(err.message) ? '令牌无效、过期或缺少 gist 权限，请重新配置'
+        : /Failed to fetch|NetworkError|load failed/i.test(err.message) ? '同步失败：网络不通（需要联网/VPN）'
+        : '同步失败：' + err.message;
+      if(manual) toast(msg);
+      return {error:msg};
+    }finally{
+      this.busy = false;
+      this._uiBusy(false);
+    }
+  },
+
+  // 删除即记墓碑并触发同步
+  async tombstone(id){
+    const tombs = (await db.getSetting('tombstones')) || [];
+    tombs.push({id, at:Date.now()});
+    await db.setSetting('tombstones', this._pruneTombs(tombs));
+    this.schedule();
+  },
+
+  // 防抖自动同步（封存/删除/导入后）
+  schedule(delay=5000){
+    clearTimeout(this._timer);
+    this._timer = setTimeout(async ()=>{
+      const ok = await db.getSetting('syncToken');
+      if(ok) this.sync({manual:false});
+    }, delay);
+  },
+
+  async configured(){
+    const [t,p] = await Promise.all([db.getSetting('syncToken'), db.getSetting('syncPassword')]);
+    return !!(t && p);
+  },
+
+  async saveConfig(token, password){
+    await db.setSetting('syncToken', token.trim());
+    await db.setSetting('syncPassword', password);
+  },
+
+  async clearConfig(){
+    await db.setSetting('syncToken', null);
+    await db.setSetting('syncPassword', null);
+  },
+
+  // ---------- UI ----------
+  _uiBusy(b){
+    const btn = $('#syncBtn');
+    if(!btn) return;
+    btn.disabled = b;
+    btn.textContent = b ? '同步中…' : '☁ 云同步';
+  },
+
+  // 自测：加密往返 + 合并/墓碑逻辑（控制台可调用 cloudSync.selftest()）
+  async selftest(){
+    const pwd = 'test-pwd-123';
+    const env = await this.encrypt({hello:'世界', n:42}, pwd, null);
+    const back = await this.decrypt(env, pwd);
+    const cryptoOk = back.hello==='世界' && back.n===42;
+    let decryptFail=false;
+    try{ await this.decrypt(env, 'wrong'); }catch(e){ decryptFail=true; }
+
+    const a = [
+      {id:1, content:'旧版', updatedAt:100},
+      {id:2, content:'本地独有', updatedAt:200}
+    ];
+    const b = { fragments:[
+      {id:1, content:'新版', updatedAt:300},
+      {id:3, content:'远端独有', updatedAt:300}
+    ], deletedIds:[{id:2, at:Date.now()}]};
+    const m = this._merge(a, [], b);
+    const mergeOk = m.fragments.find(x=>x.id===1).content==='新版'
+      && !m.fragments.some(x=>x.id===2)
+      && m.fragments.some(x=>x.id===3)
+      && m.tombstones.some(t=>t.id===2);
+    return {cryptoOk, wrongPasswordRejected:decryptFail, mergeOk};
+  }
+};
+window.cloudSync = cloudSync; // 便于控制台排错，同源页面本身即可访问全部本地数据
+
+/* ============================================================
+ * 第 5 层：事件监听层（用户操作 → 改数据 → 更新状态 → 重绘）
+ * ============================================================ */
+let toastTimer;
+function toast(msg){
+  const el = $('#toast');
+  el.textContent = msg;
+  el.style.pointerEvents = 'none';
+  el.style.cursor = 'default';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), 2600);
+}
+
+// 版本更新提示：常驻、可点击，点击后立即接管新版并刷新
+function showUpdateToast(onClick){
+  const el = $('#toast');
+  el.textContent = '🔄 发现新版本，点此立即更新';
+  el.style.pointerEvents = 'auto';
+  el.style.cursor = 'pointer';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  const handler = ()=>{
+    el.removeEventListener('click', handler);
+    onClick();
+  };
+  el.addEventListener('click', handler);
+}
+
+/* ---------- 云同步弹窗辅助 ---------- */
+async function openSyncModal(){
+  const configured = await cloudSync.configured();
+  $('#syncSetupView').classList.toggle('hidden', configured);
+  $('#syncStatusView').classList.toggle('show', configured);
+  $('#syncTokenInput').value='';
+  $('#syncPwdInput').value='';
+  syncModalStatus('');
+  renderSyncUI();
+  $('#syncModal').classList.add('open');
+}
+function closeSyncModal(){ $('#syncModal').classList.remove('open'); }
+function syncModalStatus(text, isErr=false, isOk=false){
+  const el = $('#syncStatusLine');
+  el.textContent = text || '';
+  el.classList.toggle('err', !!isErr);
+  el.classList.toggle('ok', !!isOk);
+}
+async function renderSyncUI(){
+  const last = await db.getSetting('lastSyncAt');
+  const lastLine = $('#syncLastLine');
+  if(lastLine) lastLine.textContent = '上次成功同步：' + utils.formatTime(last);
+  const btn = $('#syncBtn');
+  if(btn && !cloudSync.busy){
+    btn.textContent = '☁ 云同步';
+    btn.title = last ? ('上次同步 '+utils.formatTime(last)) : '三端云同步（GitHub Gist 加密）';
+  }
+}
+
+function bindEvents(){
+  // —— 封存碎片 ——
+  $('#saveBtn').addEventListener('click', async ()=>{
+    const content = $('#contentInput').value.trim();
+    if(!content && !state.pendingImage) return;
+
+    const item = {
+      id: utils.uid(),
+      space: state.currentSpace,
+      type: state.pendingImage ? 'image' : 'text',
+      content,
+      tags: [...new Set(state.pendingTags)],
+      image: state.pendingImage,
+      parentId: null,          // V2.0 关联功能预留
+      audioUrl: null,          // V2.1 音乐卡预留
+      coverImg: null,
+      comments: '',
+      createdAt: Date.now(),
+      updatedAt: Date.now()    // 云同步按此字段做"最后修改胜出"
+    };
+    try{
+      await db.addItem(item);
+      state.items.push(item);
+      // 清空录入区
+      $('#contentInput').value='';
+      state.pendingTags=[]; state.pendingImage=null;
+      render.tagChips(); render.imagePreview(); render.saveButton();
+      render.all();
+      const mode = await backup.run(false);
+      const msgMap = {
+        unchanged:'已封存',
+        dir:'已封存并备份到文件夹',
+        download:'已封存，备份已下载',
+        shared:'已封存',
+        skipped:'已封存（记得点「导出备份」存到文件）'
+      };
+      toast(msgMap[mode] || '已封存');
+      cloudSync.schedule(); // 已配置同步则几秒后自动上传
+    }catch(err){
+      console.error(err);
+      toast('封存失败，请查看控制台');
+    }
+  });
+
+  // 录入区内容变化 → 控制封存按钮可用状态
+  $('#contentInput').addEventListener('input', ()=>render.saveButton());
+
+  // —— 标签输入：回车 / 逗号添加 ——
+  $('#tagInput').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' || e.key===',' || e.key==='，'){
+      e.preventDefault();
+      const parts = utils.parseTags(e.target.value);
+      parts.forEach(t=>{ if(!state.pendingTags.includes(t)) state.pendingTags.push(t); });
+      e.target.value='';
+      render.tagChips();
+    }else if(e.key==='Backspace' && !e.target.value && state.pendingTags.length){
+      state.pendingTags.pop(); render.tagChips();
+    }
+  });
+  $('#tagInput').addEventListener('blur', (e)=>{
+    const parts = utils.parseTags(e.target.value);
+    parts.forEach(t=>{ if(!state.pendingTags.includes(t)) state.pendingTags.push(t); });
+    e.target.value=''; render.tagChips();
+  });
+
+  // —— 图片上传（Canvas 压缩） ——
+  $('#imageBtn').addEventListener('click', ()=>$('#imageInput').click());
+  $('#imageInput').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      state.pendingImage = await utils.compressImage(file);
+      render.imagePreview(); render.saveButton();
+    }catch(err){ console.error(err); toast('图片处理失败'); }
+  });
+  $('#imgRemoveBtn').addEventListener('click', ()=>{
+    state.pendingImage=null; render.imagePreview(); render.saveButton();
+  });
+
+  // —— 粘贴图片 ——
+  document.addEventListener('paste', async (e)=>{
+    const file = [...(e.clipboardData.files||[])].find(f=>f.type.startsWith('image/'));
+    if(!file) return;
+    try{
+      state.pendingImage = await utils.compressImage(file);
+      render.imagePreview(); render.saveButton();
+      toast('已粘贴图片');
+    }catch(err){ console.error(err); }
+  });
+
+  // —— 三层空间 Tab ——
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      state.currentSpace = tab.dataset.space;
+      render.tabs(); render.cards();
+    });
+  });
+
+  // —— 实时搜索（防抖） ——
+  $('#searchInput').addEventListener('input', utils.debounce((e)=>{
+    state.search = e.target.value;
+    render.cards();
+  },180));
+
+  // —— 瀑布流事件委托：点卡片开抽屉，点 ✕ 删除 ——
+  $('#masonry').addEventListener('click', async (e)=>{
+    const delBtn = e.target.closest('[data-action="delete"]');
+    const cardEl = e.target.closest('.card');
+    if(!cardEl) return;
+    const id = Number(cardEl.dataset.id);
+    if(delBtn){
+      e.stopPropagation();
+      const item = state.items.find(x=>x.id===id);
+      if(!confirm(`确定删除这块碎片吗？\n\n「${(item.content||'（图片碎片）').slice(0,30)}…」\n\n删除后会同步到其他设备。`)) return;
+      await db.deleteItem(id);
+      await cloudSync.tombstone(id); // 记墓碑并触发云同步（未开启同步时无副作用）
+      state.items = state.items.filter(x=>x.id!==id);
+      render.all();
+      await backup.run(false);
+      return;
+    }
+    render.openDrawer(id);
+  });
+
+  // —— 抽屉关闭 ——
+  $('#drawerClose').addEventListener('click', ()=>render.closeDrawer());
+  $('#scrim').addEventListener('click', ()=>render.closeDrawer()); // 视觉层点击也可关闭（不阻挡滚动）
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') render.closeDrawer(); });
+
+  // —— 日/夜模式 ——
+  $('#themeBtn').addEventListener('click', async ()=>{
+    state.theme = state.theme==='dark' ? 'light' : 'dark';
+    render.theme();
+    await db.setSetting('theme', state.theme);
+  });
+
+  // —— 手动导出 / 导入 / 授权备份文件夹 ——
+  $('#exportBtn').addEventListener('click', async ()=>{
+    const mode = await backup.run(true);
+    const msgMap = {
+      dir:'已覆盖写入备份文件夹',
+      shared:'已打开系统分享，可存储到"文件"/微信',
+      download:'备份文件已开始下载',
+      cancelled:'已取消导出'
+    };
+    toast(msgMap[mode] || '已导出备份');
+  });
+
+  // —— PWA 安装 ——
+  // 平台识别：iOS/iPadOS 任何浏览器都不触发 beforeinstallprompt，只能引导手动添加；
+  // iPadOS 桌面版 UA 伪装成 Mac，靠触屏点兜底识别。
+  const _ua = navigator.userAgent || '';
+  const pwa = {
+    standalone: window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
+    ios: /iPad|iPhone|iPod/.test(_ua) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints||0) > 1),
+    touch: (navigator.maxTouchPoints||0) > 0 || 'ontouchstart' in window
+  };
+
+  let deferredInstall = null;
+  const installBtn = $('#installBtn');
+  const showInstallButton = ()=>{ if(!pwa.standalone) installBtn.style.display = ''; };
+
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    deferredInstall = e;
+    showInstallButton();
+  });
+
+  function openInstallHelp(){
+    $('#installViewIos').classList.toggle('show', pwa.ios);
+    $('#installViewAndroid').classList.toggle('show', !pwa.ios);
+    $('#installModal').classList.add('open');
+  }
+  const closeInstallHelp = ()=>$('#installModal').classList.remove('open');
+
+  installBtn.addEventListener('click', async ()=>{
+    if(pwa.standalone) return;
+    if(deferredInstall){
+      const d = deferredInstall;
+      try{
+        d.prompt();
+        // 部分容器浏览器（如出境易内的 Edge）prompt() 毫无响应，4.5 秒兜底转手动指引
+        const choice = await Promise.race([
+          d.userChoice,
+          new Promise(r=>setTimeout(()=>r({outcome:'timeout'}), 4500))
+        ]);
+        if(choice && choice.outcome === 'accepted'){
+          installBtn.style.display = 'none';
+          toast('已安装到桌面/主屏幕');
+          return;
+        }
+      }catch(err){ /* 弹窗被浏览器拒绝或事件已消费，落到手动指引 */ }
+      deferredInstall = null;
+    }
+    openInstallHelp();
+  });
+  window.addEventListener('appinstalled', ()=>{ installBtn.style.display='none'; });
+  $('#installCloseBtn').addEventListener('click', closeInstallHelp);
+  $('#installModal').addEventListener('click', (e)=>{
+    if(e.target.id === 'installModal') closeInstallHelp();
+  });
+
+  // iOS 永远只能手动装，直接给按钮；安卓触屏 1.2 秒内没收到安装事件（火狐/容器等）也给手动入口
+  if(!pwa.standalone){
+    if(pwa.ios) showInstallButton();
+    else if(pwa.touch) setTimeout(showInstallButton, 1200);
+  }
+
+  // —— 云同步：按钮、弹窗、配置 ——
+  $('#syncBtn').addEventListener('click', async ()=>{
+    if(await cloudSync.configured()){
+      const r = await cloudSync.sync({manual:true});
+      renderSyncUI();
+      if(typeof r === 'object' && r.error) syncModalStatus(r.error, true);
+    }else{
+      openSyncModal();
+    }
+  });
+
+  $('#syncSaveBtn').addEventListener('click', async ()=>{
+    const token = $('#syncTokenInput').value.trim();
+    const pwd = $('#syncPwdInput').value;
+    if(!token || !pwd){ syncModalStatus('令牌和同步密码都要填写', true); return; }
+    syncModalStatus('正在连接并同步…');
+    await cloudSync.saveConfig(token, pwd);
+    const r = await cloudSync.sync({manual:false});
+    if(typeof r === 'object' && r.error){
+      syncModalStatus(r.error, true);
+      await cloudSync.clearConfig(); // 失败不保留坏配置
+      return;
+    }
+    toast('☁ 同步已开启');
+    closeSyncModal();
+    renderSyncUI();
+  });
+
+  $('#syncNowBtn').addEventListener('click', async ()=>{
+    syncModalStatus('正在同步…');
+    const r = await cloudSync.sync({manual:false});
+    if(typeof r === 'object' && r.error){ syncModalStatus(r.error, true); }
+    else{ syncModalStatus('同步完成', false, true); }
+    renderSyncUI();
+  });
+
+  $('#syncUnlinkBtn').addEventListener('click', async ()=>{
+    if(!confirm('仅清除本机的令牌与密码配置，本地数据与云端 Gist 均不删除。\n确定？')) return;
+    await cloudSync.clearConfig();
+    toast('已取消本机同步配置');
+    openSyncModal();
+  });
+
+  $('#syncSetupCloseBtn').addEventListener('click', closeSyncModal);
+  $('#syncStatusCloseBtn').addEventListener('click', closeSyncModal);
+  $('#syncModal').addEventListener('click', (e)=>{
+    if(e.target.id === 'syncModal') closeSyncModal();
+  });
+  $('#syncPwdInput').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') $('#syncSaveBtn').click();
+  });
+
+  // 恢复联网后自动补同步
+  window.addEventListener('online', ()=>cloudSync.schedule(1500));
+
+  $('#importBtn').addEventListener('click', ()=>$('#importInput').click());
+  $('#importInput').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    e.target.value='';
+    if(!file) return;
+    if(!confirm('导入将覆盖当前浏览器里的全部碎片。\n（导入文件本身就是备份，恢复后不会重复下载。）\n确定继续？')) return;
+    try{
+      const text = await file.text();
+      const data = JSON.parse(text);
+      // 兼容两种格式：{fragments:[...]} 包装格式 与 裸数组
+      const items = Array.isArray(data) ? data : (data.fragments || []);
+      const valid = items.filter(x=>x && typeof x.id==='number' && typeof x.content==='string')
+        .map(x=>Object.assign({
+          space:'workspace', type:'text', tags:[], image:null,
+          parentId:null, audioUrl:null, coverImg:null, comments:'',
+          createdAt:x.createdAt||Date.now(),
+          updatedAt:x.updatedAt||x.createdAt||Date.now()
+        }, x));
+      if(!valid.length){ toast('文件里没有识别到有效碎片'); return; }
+      await db.replaceAll(valid);
+      state.items = valid;
+      // 导入的数据与备份文件一致，直接记录指纹，避免立即重复备份
+      await db.setSetting('lastBackupHash', utils.fingerprint(valid));
+      await db.setSetting('lastExportAt', Date.now());
+      render.all();
+      render.closeDrawer();
+      toast(`已恢复 ${valid.length} 块碎片`);
+      cloudSync.schedule(); // 导入的数据也推送到云端
+    }catch(err){
+      console.error(err);
+      toast('导入失败：文件格式不正确');
+    }
+  });
+
+  if('showDirectoryPicker' in window){
+    $('#backupDirBtn').addEventListener('click', ()=>backup.setupDir());
+  }
+}
+
+/* ============================================================
+ * PWA 启动层：仅在 http(s) 托管环境启用（GitHub Pages / localhost）
+ * 双击 file:// 打开时直接跳过，保证单文件离线版零外部依赖。
+ * 作用：可"安装到桌面/主屏幕"、全屏运行、Service Worker 离线缓存。
+ * ============================================================ */
+async function setupPWA(){
+  // file:// 协议下什么都不做（单文件作业提交版保持纯净）
+  if(location.protocol === 'file:') return;
+  if(!('serviceWorker' in navigator)) return;
+
+  // 动态挂载清单与 iOS 主屏幕图标，避免单文件版出现无效引用
+  const manifest = document.createElement('link');
+  manifest.rel = 'manifest';
+  manifest.href = 'manifest.webmanifest';
+  document.head.appendChild(manifest);
+
+  const appleIcon = document.createElement('link');
+  appleIcon.rel = 'apple-touch-icon';
+  appleIcon.href = 'icons/apple-touch-icon.png';
+  document.head.appendChild(appleIcon);
+
+  const theme = document.createElement('meta');
+  theme.name = 'theme-color';
+  theme.content = '#5E5CE6';
+  document.head.appendChild(theme);
+
+  // iOS Safari 主屏幕 App 专用 meta（全屏、状态栏、桌面标题）——manifest 之外的双保险
+  const appleCapable = document.createElement('meta');
+  appleCapable.name = 'apple-mobile-web-app-capable';
+  appleCapable.content = 'yes';
+  document.head.appendChild(appleCapable);
+
+  const appleTitle = document.createElement('meta');
+  appleTitle.name = 'apple-mobile-web-app-title';
+  appleTitle.content = '灵感收纳盒';
+  document.head.appendChild(appleTitle);
+
+  const appleBar = document.createElement('meta');
+  appleBar.name = 'apple-mobile-web-app-status-bar-style';
+  appleBar.content = 'black';
+  document.head.appendChild(appleBar);
+
+  try{
+    const reg = await navigator.serviceWorker.register('sw.js');
+
+    // 新版本接管后自动刷新一次（仅发生在启动瞬间，不会打断录入）
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+      if(refreshing) return;
+      refreshing = true;
+      location.reload();
+    });
+
+    // 发现等待中的新版 → 顶部出现可点击提示，点一下立即更新
+    const promptUpdate = (worker)=>{
+      showUpdateToast(()=>{
+        worker.postMessage({type:'SKIP_WAITING'});
+      });
+    };
+    if(reg.waiting && navigator.serviceWorker.controller) promptUpdate(reg.waiting);
+    reg.addEventListener('updatefound', ()=>{
+      const worker = reg.installing;
+      if(!worker) return;
+      worker.addEventListener('statechange', ()=>{
+        if(worker.state === 'installed' && navigator.serviceWorker.controller){
+          promptUpdate(worker);
+        }
+      });
+    });
+  }catch(err){
+    console.warn('Service Worker 注册失败（不影响使用）：', err);
+  }
+}
+
+/* ============================================================
+ * 第 6 层：启动入口
+ * ============================================================ */
+async function init(){
+  try{
+    await db.open();
+    state.items = await db.getAll();
+    state.theme = await db.getSetting('theme') || 'light';
+
+    render.theme();
+    render.tabs();
+    render.tagChips();
+    render.imagePreview();
+    render.saveButton();
+    render.backupDirButton();
+    render.all();
+    bindEvents();
+
+    // 已授权过文件夹时，按钮显示已连接
+    if(await db.getSetting('backupDirHandle')){
+      $('#backupDirBtn').textContent = '✓ 备份文件夹已连接';
+    }
+
+    // 托管环境下启用 PWA（离线缓存/可安装），file:// 下自动跳过
+    setupPWA();
+
+    // 已配置云同步：刷新按钮状态，启动 1.5 秒后自动拉取一次
+    renderSyncUI();
+    if(await cloudSync.configured()){
+      setTimeout(()=>cloudSync.sync({manual:false}), 1500);
+    }
+  }catch(err){
+    console.error('启动失败：', err);
+    document.body.insertAdjacentHTML?.('beforeend','');
+    alert('应用启动失败：' + (err && err.message));
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

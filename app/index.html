@@ -171,6 +171,10 @@
   .card img.card-img{width:100%;display:block;}
   .card-body{padding:13px 15px 14px;}
   .card-content{font-size:14px;white-space:pre-wrap;word-break:break-word;}
+  /* 正文内自动识别的链接（V1.4）：品牌色 + 下划线，长链接换行不撑破卡片 */
+  .frag-link{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
+    overflow-wrap:anywhere;cursor:pointer;}
+  .frag-link:hover{opacity:.8;}
   .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
   .card-tag{font-size:11px;color:var(--accent);background:var(--accent-soft);
     padding:2px 9px;border-radius:999px;}
@@ -298,7 +302,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.3.5</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -430,21 +434,23 @@
 
 <script>
 /* ============================================================
- * 灵感收纳盒 V1.0  —— 单文件 HTML（原生 JS，零外部依赖）
+ * 灵感收纳盒 v1.4  —— 单文件 HTML（原生 JS，零外部依赖）
  * 代码六层结构：
  *   第 1 层 常量与工具层 utils
  *   第 2 层 数据操作层 db（全项目只有这一层碰 IndexedDB）
+ *   第 2B 层 云同步服务 cloudSync（V1.3 起，本地优先、可选开启）
  *   第 3 层 状态层 state
  *   第 4 层 UI 渲染层 render
  *   第 5 层 事件监听层 events
  *   第 6 层 启动入口 init
- * 安全铁律：所有用户文本一律用 textContent 渲染，严禁 innerHTML
+ * 安全铁律：所有用户文本一律用 createElement/textContent 渲染，严禁 innerHTML；
+ *           外链仅允许 http/https，新标签打开并带 noopener（见 render.linkedText）
  * ============================================================ */
 
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.3.5';
+const APP_VERSION = '1.4';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -723,6 +729,46 @@ const render = {
     }, 120);
   },
 
+  // 把正文中的 http(s) 链接安全地拆成"文本节点 + 可点击 <a>"（V1.4）。
+  // 全程 createElement/textContent，不使用 innerHTML；正则只认 http(s)，
+  // 再经 URL 协议白名单二次校验——javascript:/data: 等一律按纯文本显示。
+  linkedText(text){
+    const frag = document.createDocumentFragment();
+    if(!text) return frag;
+    const re = /https?:\/\/[^\s<>"'`，。！？、；：）】》」』…]+/gi;
+    let last = 0, m;
+    while((m = re.exec(text)) !== null){
+      if(m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      let url = m[0], tail = '';
+      // 裸域名结尾的英文句点通常是句子标点（如"见 https://a.com."），不当作 URL 一部分
+      try{
+        let u = new URL(url);
+        if(u.pathname === '/' && !u.search && !u.hash && url.endsWith('.')){
+          tail = '.'; url = url.slice(0, -1); u = new URL(url);
+        }
+        if(u.protocol === 'http:' || u.protocol === 'https:'){
+          const a = document.createElement('a');
+          a.className = 'frag-link';
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = url;
+          // 点链接只打开链接，不冒泡触发卡片抽屉
+          a.addEventListener('click', e=>e.stopPropagation());
+          frag.appendChild(a);
+          if(tail) frag.appendChild(document.createTextNode(tail));
+        }else{
+          frag.appendChild(document.createTextNode(m[0]));
+        }
+      }catch(e){
+        frag.appendChild(document.createTextNode(m[0]));
+      }
+      last = m.index + m[0].length;
+    }
+    if(last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    return frag;
+  },
+
   // 单张卡片（全部用 createElement + textContent，杜绝 XSS）
   card(item){
     const card = document.createElement('article');
@@ -743,7 +789,7 @@ const render = {
 
     const content = document.createElement('div');
     content.className = 'card-content';
-    content.textContent = item.content;
+    content.appendChild(this.linkedText(item.content));
     body.appendChild(content);
 
     if(item.tags && item.tags.length){
@@ -787,7 +833,7 @@ const render = {
     }
     const content = document.createElement('div');
     content.className = 'drawer-content';
-    content.textContent = item.content;
+    content.appendChild(this.linkedText(item.content));
     body.appendChild(content);
 
     if(item.tags && item.tags.length){

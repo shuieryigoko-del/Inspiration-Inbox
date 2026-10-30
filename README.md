@@ -42,7 +42,7 @@
 
 ```
 app/                 应用本体（index.html + sw.js + manifest + icons）
-docs/                产品与技术文档 7 份（md + docx）
+docs/                产品与技术文档 7 份（Markdown；提交前可用 md2docx 转 Word）
 backups/code/        每个版本的单文件快照
 index.html           仓库根跳转页
 ```

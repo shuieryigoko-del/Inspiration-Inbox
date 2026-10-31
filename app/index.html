@@ -226,6 +226,7 @@
   .drawer-grabber{display:none;}
   .drawer-size-btn{display:none;}
   .drawer-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
+  .drawer-edit-btn{width:auto;padding:0 12px;font-size:13px;}
   .drawer-title{font-size:13px;color:var(--text-2);flex:1;letter-spacing:1px;}
   .drawer-body{flex:1;overflow-y:auto;padding:20px 22px 40px;}
   .drawer-body img{width:100%;border-radius:14px;margin-bottom:16px;display:block;}
@@ -332,7 +333,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4.4</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.5.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -369,6 +370,7 @@
     </div>
     <span class="space-hint">将封存至：<b id="spaceHint">工作台</b></span>
     <span id="backupReminderMini" class="backup-reminder-mini"></span>
+    <button id="cancelEditBtn" class="text-btn" style="display:none">取消编辑</button>
     <button id="saveBtn" class="save-btn" disabled>封存碎片</button>
   </div>
 </section>
@@ -381,6 +383,7 @@
   <div class="drawer-grabber" id="drawerGrabber" role="button" aria-label="展开或收起详情"></div>
   <div class="drawer-head">
     <span class="drawer-title">碎片详情 · FRAGMENT</span>
+    <button id="drawerEditBtn" class="icon-btn drawer-edit-btn" title="编辑这条碎片">编辑</button>
     <button id="drawerSizeBtn" class="icon-btn drawer-size-btn" title="展开/收起" aria-label="展开或收起">˄</button>
     <button id="drawerClose" class="icon-btn" style="width:34px;height:34px;">✕</button>
   </div>
@@ -482,7 +485,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.4.4';
+const APP_VERSION = '1.5.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -621,6 +624,14 @@ const db = {
     });
   },
 
+  // 编辑已有碎片：按主键覆盖写（V1.5）
+  updateItem(item){
+    return new Promise((resolve,reject)=>{
+      const req = this._tx(STORE_FRAGMENTS,'readwrite').put(item);
+      req.onsuccess=()=>resolve(item); req.onerror=()=>reject(req.error);
+    });
+  },
+
   getAll(){
     return new Promise((resolve,reject)=>{
       const req = this._tx(STORE_FRAGMENTS,'readonly').getAll();
@@ -684,7 +695,8 @@ const state = {
   theme: 'light',
   pendingImage: null,      // 录入区待封存的图片 Base64
   pendingTags: [],        // 录入区已添加的标签
-  drawerId: null          // 当前抽屉中的碎片 id；null = 关闭
+  drawerId: null,         // 当前抽屉中的碎片 id；null = 关闭
+  editingId: null         // V1.5：正在编辑的碎片 id；null = 非编辑态
 };
 
 /* ============================================================
@@ -920,6 +932,44 @@ const render = {
     $('#scrim').classList.add('open');
     document.body.classList.add('drawer-open'); // 背景让出抽屉空间（V1.4.1）
     $('#drawer').setAttribute('aria-hidden','false');
+    $('#drawerEditBtn').style.display = '';
+  },
+
+  // V1.5 编辑：把抽屉里的碎片灌回顶部录入区
+  startEdit(){
+    if(!state.drawerId) return;
+    const item = state.items.find(x=>x.id===state.drawerId);
+    if(!item) return;
+    // 先收起抽屉：桌面右侧抽屉会盖住录入区右下角的「保存修改」按钮
+    $('#drawer').classList.remove('open');
+    $('#scrim').classList.remove('open');
+    document.body.classList.remove('drawer-open');
+    document.body.classList.remove('drawer-full');
+    $('#drawer').setAttribute('aria-hidden','true');
+    $('#drawerEditBtn').style.display = 'none';
+    state.drawerId = null;
+    state.editingId = item.id;
+    $('#contentInput').value = item.content || '';
+    state.pendingTags = Array.isArray(item.tags) ? item.tags.slice() : [];
+    state.pendingImage = item.image ? { src:item.image, w:item.imageW||null, h:item.imageH||null } : null;
+    this.tagChips(); this.imagePreview(); this.saveButton();
+    $('#saveBtn').textContent = '保存修改';
+    $('#cancelEditBtn').style.display = '';
+    const input = $('#contentInput');
+    input.focus();
+    input.scrollIntoView({ behavior:'smooth', block:'center' }); // 手机上看得到"确实进了编辑"
+  },
+
+  // 退出编辑态：录入区清空，数据一律不动
+  cancelEdit(){
+    if(!state.editingId) return;
+    state.editingId = null;
+    $('#contentInput').value = '';
+    state.pendingTags = [];
+    state.pendingImage = null;
+    this.tagChips(); this.imagePreview(); this.saveButton();
+    $('#saveBtn').textContent = '封存碎片';
+    $('#cancelEditBtn').style.display = 'none';
   },
 
   // 手机端半屏/全屏两档切换（桌面右侧抽屉不受影响）
@@ -936,6 +986,8 @@ const render = {
   },
 
   closeDrawer(){
+    this.cancelEdit();            // 关抽屉即退出编辑，避免改到一半悬空
+    $('#drawerEditBtn').style.display = 'none';
     state.drawerId = null;
     $('#drawer').classList.remove('open');
     $('#scrim').classList.remove('open');
@@ -1532,6 +1584,36 @@ function bindEvents(){
     const content = $('#contentInput').value.trim();
     if(!content && !state.pendingImage) return;
 
+    // V1.5：编辑态保存——只改内容/标签/图片，updatedAt 走 LWW 同步
+    if(state.editingId){
+      const old = state.items.find(x=>x.id===state.editingId);
+      if(!old){ render.cancelEdit(); return; }
+      const next = {
+        ...old,
+        type: state.pendingImage ? 'image' : (old.type==='image' ? 'text' : old.type),
+        content,
+        tags: [...new Set(state.pendingTags)],
+        image: state.pendingImage ? state.pendingImage.src : null,
+        imageW: state.pendingImage ? state.pendingImage.w : null,
+        imageH: state.pendingImage ? state.pendingImage.h : null,
+        updatedAt: Date.now()
+      };
+      try{
+        await db.updateItem(next);
+        const idx = state.items.findIndex(x=>x.id===next.id);
+        if(idx>=0) state.items[idx] = next;
+        render.cancelEdit();
+        render.all();
+        if(state.drawerId===next.id) render.drawer(next); // 抽屉内容同步刷新
+        toast('已保存修改');
+        cloudSync.schedule();
+      }catch(err){
+        console.error(err);
+        toast('保存失败，请查看控制台');
+      }
+      return;
+    }
+
     const item = {
       id: utils.uid(),
       space: state.currentSpace,
@@ -1657,6 +1739,8 @@ function bindEvents(){
   $('#scrim').addEventListener('click', ()=>render.closeDrawer()); // 视觉层点击也可关闭（不阻挡滚动）
   $('#drawerGrabber').addEventListener('click', ()=>render.toggleDrawerSize());
   $('#drawerSizeBtn').addEventListener('click', ()=>render.toggleDrawerSize());
+  $('#drawerEditBtn').addEventListener('click', ()=>render.startEdit());
+  $('#cancelEditBtn').addEventListener('click', ()=>render.cancelEdit());
   document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') render.closeDrawer(); });
 
   // —— 日/夜模式 ——

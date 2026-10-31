@@ -333,7 +333,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.5.0</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.5.1</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -485,7 +485,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1218,17 +1218,43 @@ const cloudSync = {
   async encrypt(obj, password, saltB64){
     const salt = saltB64 ? this._unb64(saltB64) : crypto.getRandomValues(new Uint8Array(16));
     const key = await this._deriveKey(password, salt);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, this._enc.encode(JSON.stringify(obj)));
-    return { v:1, salt:this._b64(salt.buffer), iv:this._b64(iv.buffer), ct:this._b64(ct) };
+    const env = await this._encWithKey(obj, key);
+    return { v:2, salt:this._b64(salt.buffer), iv:env.iv, ct:env.ct };
   },
 
   async decrypt(env, password){
     const key = await this._deriveKey(password, this._unb64(env.salt));
+    return this._decWithKey(env, key, true);
+  },
+
+  // V1.5.1：一次同步只派生一次密钥，主文件与所有图片附件共用（IV 每文件随机）
+  async _encWithKey(obj, key){
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, this._enc.encode(typeof obj==='string'?obj:JSON.stringify(obj)));
+    return { iv:this._b64(iv.buffer), ct:this._b64(ct) };
+  },
+
+  async _decWithKey(env, key, asJson=false){
     const plain = await crypto.subtle.decrypt(
       {name:'AES-GCM', iv:this._unb64(env.iv)}, key, this._unb64(env.ct)
     );
-    return JSON.parse(this._dec.decode(plain));
+    const text = this._dec.decode(plain);
+    return asJson ? JSON.parse(text) : text;
+  },
+
+  // 图片内容指纹（附件 gist 的文件名即指纹 → 天然去重、迁移可重入）
+  async _sha256Hex(s){
+    const buf = await crypto.subtle.digest('SHA-256', this._enc.encode(s));
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  },
+
+  _attName(ref){ return 'att-'+ref+'.json'; },
+
+  // 上传主文件时剥离图片本体：主文件只留元数据 + imageRef（imageW/H 保留，占位防跳列）
+  _strip(frag){
+    const c = Object.assign({}, frag);
+    delete c.image;
+    return c;
   },
 
   // ---------- Gist API ----------
@@ -1271,6 +1297,50 @@ const cloudSync = {
     return res.text();
   },
 
+  // ---------- 图片附件：每张图一个独立加密 gist（V1.5.1）----------
+  // 不用单 gist 多文件：GET 单个 gist 会内联返回全部 <1MB 文件内容，拆了仍要全量下载。
+  // gist 列表接口只给文件名/大小不给内容，所以"主 gist + 一图一 gist"才能按需下载。
+
+  // 按内容指纹找回附件 gist（迁移中断重试时保证幂等，不产生重复 gist）
+  async _findAttGist(token, ref){
+    const want = this._attName(ref);
+    for(let page=1; page<=5; page++){
+      const list = await this._api('/gists?per_page=100&page='+page, token);
+      if(!list.length) break;
+      const hit = list.find(g => g.files && g.files[want]);
+      if(hit) return hit.id;
+    }
+    return null;
+  },
+
+  // 缺则建：把一张图的密文放进独立 gist，返回 gistId
+  async _ensureAttGist(token, ref, imageB64, key){
+    let id = await this._findAttGist(token, ref);
+    if(id) return id;
+    const env = await this._encWithKey(imageB64, key); // 附件直接加密 base64 字符串
+    const created = await this._api('/gists', token, {
+      method:'POST',
+      body:JSON.stringify({
+        description:'Inspiration Inbox attachment',
+        public:false,
+        files:{ [this._attName(ref)]:{ content:JSON.stringify(env) } }
+      })
+    });
+    return created.id;
+  },
+
+  // 按 gistId 取回并解密一张图（单文件 gist，下载量≈这一张图）
+  async _fetchAtt(token, gistId, key){
+    const gist = await this._api('/gists/'+gistId, token);
+    const name = Object.keys(gist.files)[0];
+    const f = gist.files[name];
+    const raw = f.truncated
+      ? await (await fetch(f.raw_url, {cache:'no-store'})).text()
+      : (f.content || '');
+    if(!raw) throw new Error('图片附件内容为空');
+    return this._decWithKey(JSON.parse(raw), key, false);
+  },
+
   // ---------- 合并算法（纯函数，便于自测）----------
   _pruneTombs(tombs, now=Date.now()){
     const map = new Map();
@@ -1298,7 +1368,8 @@ const cloudSync = {
   // 合并后整体状态的指纹（碎片全量字段 + 墓碑，顺序无关）：
   // 与上次成功推送的指纹相同就跳过全量上传，避免每轮轮询把整个 Gist 重传一遍
   _stateHash(fragments, tombs){
-    const f = fragments.map(x=>JSON.stringify(x)).sort();
+    // 指纹按"剥离图片本体后"的形态计算：图片走独立附件 gist，只换图不改文字也能识别
+    const f = fragments.map(x=>JSON.stringify(this._strip(x))).sort();
     const t = (tombs||[]).map(x=>`${x.id}:${x.at}`).sort().join(',');
     return utils.hash(JSON.stringify(f) + '|' + t);
   },
@@ -1358,6 +1429,18 @@ const cloudSync = {
 
       const localItems = await db.getAll();
       const localTombs = this._pruneTombs((await db.getSetting('tombstones')) || []);
+
+      // 盐以云端信封为准（保证三端同密码→同密钥）；V1.5.1 起密钥全程只派生一次
+      const useSalt = remoteSalt
+        || await db.getSetting('syncSalt')
+        || this._b64(crypto.getRandomValues(new Uint8Array(16)).buffer);
+      const aesKey = await this._deriveKey(password, this._unb64(useSalt));
+
+      // 图片附件清单 imageRef→gistId：304 时用本机缓存，全量拉取时以云端为准
+      let attMap = notModified
+        ? ((await db.getSetting('syncAtts')) || {})
+        : ((remotePlain && remotePlain.atts) || {});
+
       let mergedFragments, mergedTombstones;
       if(notModified){
         // 云端没变：本机库就是最新合并结果，无需解密合并、无需重写库
@@ -1367,13 +1450,36 @@ const cloudSync = {
         const merged = this._merge(localItems, localTombs, remotePlain);
         mergedFragments = merged.fragments;
         mergedTombstones = merged.tombstones;
+      }
+
+      // ① 本机有图但没有指纹的旧碎片（V1.5.1 前数据）：补算内容指纹
+      let refsAssigned = false;
+      for(const f of mergedFragments){
+        if(f.image && !f.imageRef){ f.imageRef = await this._sha256Hex(f.image); refsAssigned = true; }
+      }
+
+      // ② 碎片有指纹却没有图片（v2 远端/或远端较新版本）：只下载缺失的那几张
+      if(!notModified){
+        for(const f of mergedFragments){
+          if(f.image || !f.imageRef) continue;
+          let attId = attMap[f.imageRef];
+          if(!attId) attId = await this._findAttGist(token, f.imageRef); // 清单缺失时按指纹兜底找回
+          if(!attId){
+            // 找不到附件必须中止：否则会把"无图版本"合并后推上去，覆盖还存着图片的设备
+            throw new Error('云端缺少图片附件（'+f.imageRef.slice(0,8)+'…），请在存有这张图的设备上先同步一次');
+          }
+          f.image = await this._fetchAtt(token, attId, aesKey);
+          attMap[f.imageRef] = attId;
+        }
         await db.applyMerge(mergedFragments, mergedTombstones.map(t=>t.id));
         await db.setSetting('tombstones', mergedTombstones);
         state.items = mergedFragments;
         if(etag) await db.setSetting('syncEtag', etag);
+      }else if(refsAssigned){
+        await db.applyMerge(mergedFragments, []); // 304 路径只补写指纹，不删除任何数据
       }
 
-      // 指纹与上次成功推送一致 → 双方都没有新内容，跳过全量 PATCH（省去近 1MB 上传）
+      // 指纹与上次成功推送一致 → 双方都没有新内容，跳过上传（主文件已只有几十 KB）
       const stateHash = this._stateHash(mergedFragments, mergedTombstones);
       const lastHash = await db.getSetting('syncStateHash');
       if(gistId && stateHash === lastHash){
@@ -1384,15 +1490,36 @@ const cloudSync = {
         return 'ok';
       }
 
-      // 盐以云端信封为准（保证三端同密码→同密钥）；首次上传则沿用本机盐或新生成
-      const useSalt = remoteSalt
-        || await db.getSetting('syncSalt')
-        || this._b64(crypto.getRandomValues(new Uint8Array(16)).buffer);
+      // ③ 每张图一个独立加密 gist：只建缺失的；同内容指纹全局只传一次
+      const neededRefs = new Set();
+      mergedFragments.forEach(f=>{ if(f.imageRef) neededRefs.add(f.imageRef); });
+      const missingRefs = [...neededRefs].filter(r=>!attMap[r]);
+      let createdCount = 0;
+      for(let i=0;i<missingRefs.length;i++){
+        const ref = missingRefs[i];
+        if(missingRefs.length >= 3) this._uiBusy(true, '迁移图片 '+(i+1)+'/'+missingRefs.length);
+        const holder = mergedFragments.find(f=>f.imageRef===ref && f.image);
+        if(!holder) throw new Error('本地缺少待上传图片（'+ref.slice(0,8)+'…）');
+        attMap[ref] = await this._ensureAttGist(token, ref, holder.image, aesKey);
+        createdCount++;
+      }
+
+      // ④ 孤儿附件（已无碎片引用）：删除对应 gist；失败则保留清单，下次重试
+      for(const ref of Object.keys(attMap)){
+        if(neededRefs.has(ref)) continue;
+        try{ await this._api('/gists/'+attMap[ref], token, {method:'DELETE'}); }catch(e){ continue; }
+        delete attMap[ref];
+      }
+
+      // ⑤ 主文件：只存元数据与附件清单，图片本体全部在独立 gist 里
       const payload = {
-        app:'inspiration-inbox', kind:'sync', version:1,
-        updatedAt:Date.now(), fragments:mergedFragments, deletedIds:mergedTombstones
+        app:'inspiration-inbox', kind:'sync', version:2,
+        updatedAt:Date.now(),
+        fragments: mergedFragments.map(f=>this._strip(f)),
+        deletedIds: mergedTombstones,
+        atts: attMap
       };
-      const env = await this.encrypt(payload, password, useSalt);
+      const env = Object.assign({v:2, salt:useSalt}, await this._encWithKey(payload, aesKey));
       const body = {
         description:'Inspiration Inbox sync (encrypted)',
         public:false,
@@ -1407,6 +1534,7 @@ const cloudSync = {
 
       await db.setSetting('syncGistId', gistId);
       await db.setSetting('syncSalt', useSalt);
+      await db.setSetting('syncAtts', attMap);
       await db.setSetting('syncStateHash', stateHash);
       await db.setSetting('syncEtag', ''); // 文件已被本机改写，旧 ETag 作废，下次完整拉取
       await db.setSetting('lastSyncAt', Date.now());
@@ -1414,7 +1542,11 @@ const cloudSync = {
       this.lastError = null;
       render.all();
       renderSyncUI();
-      if(manual) toast('☁ 同步完成');
+      if(manual){
+        toast(createdCount>0
+          ? ('☁ 同步完成（已迁移 '+createdCount+' 张图片到独立加密存储，以后同步只需几秒）')
+          : '☁ 同步完成');
+      }
       return 'ok';
     }catch(err){
       console.warn('云同步失败：', err);
@@ -1472,6 +1604,7 @@ const cloudSync = {
     await db.setSetting('syncGistId', null);
     await db.setSetting('syncStateHash', null);
     await db.setSetting('syncEtag', null);
+    await db.setSetting('syncAtts', null);
   },
 
   // ---------- UI ----------
@@ -1483,11 +1616,11 @@ const cloudSync = {
     toast('☁ 自动同步未完成：' + msg);
   },
 
-  _uiBusy(b){
+  _uiBusy(b, label){
     const btn = $('#syncBtn');
     if(!btn) return;
     btn.disabled = b;
-    btn.textContent = b ? '同步中…' : (this.lastError ? '☁ 待同步' : '☁ 云同步');
+    btn.textContent = b ? (label || '同步中…') : (this.lastError ? '☁ 待同步' : '☁ 云同步');
     btn.title = (b || !this.lastError) ? '三端云同步（GitHub Gist 加密）'
       : ('上次同步未成功：' + this.lastError + '（点一次重试）');
   },
@@ -1514,7 +1647,25 @@ const cloudSync = {
       && !m.fragments.some(x=>x.id===2)
       && m.fragments.some(x=>x.id===3)
       && m.tombstones.some(t=>t.id===2);
-    return {cryptoOk, wrongPasswordRejected:decryptFail, mergeOk};
+
+    // V1.5.1：剥离图片后图片本体消失、指纹与尺寸保留
+    const stripped = this._strip({id:9, content:'x', image:'AAA', imageRef:'r1', imageW:10, imageH:20});
+    const stripOk = !('image' in stripped) && stripped.imageRef==='r1' && stripped.imageW===10;
+
+    // 附件信封（共用派生密钥，明文是 base64 字符串）往返
+    const salt = this._b64(crypto.getRandomValues(new Uint8Array(16)).buffer);
+    const key = await this._deriveKey(pwd, this._unb64(salt));
+    const attEnv = await this._encWithKey('BASE64IMG_DATA', key);
+    const attBack = await this._decWithKey(attEnv, key, false);
+    const attOk = attBack==='BASE64IMG_DATA';
+
+    // 指纹：只换图片内容（ref 变）指纹变；图片本体不进指纹
+    const h1 = this._stateHash([{id:1, content:'同', imageRef:'refA', updatedAt:1}], []);
+    const h2 = this._stateHash([{id:1, content:'同', imageRef:'refB', updatedAt:1}], []);
+    const h3 = this._stateHash([{id:1, content:'同', imageRef:'refA', image:'随便多长的base64', updatedAt:1}], []);
+    const hashOk = h1!==h2 && h1===h3;
+
+    return {cryptoOk, wrongPasswordRejected:decryptFail, mergeOk, stripOk, attOk, hashOk};
   }
 };
 window.cloudSync = cloudSync; // 便于控制台排错，同源页面本身即可访问全部本地数据

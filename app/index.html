@@ -332,7 +332,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4.3</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.4.4</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -482,7 +482,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.4.4';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -632,6 +632,18 @@ const db = {
     return new Promise((resolve,reject)=>{
       const req = this._tx(STORE_FRAGMENTS,'readwrite').delete(id);
       req.onsuccess=()=>resolve(); req.onerror=()=>reject(req.error);
+    });
+  },
+
+  // 云同步合并结果写库：按 id 覆盖写入 + 只删除墓碑里的（V1.4.4）
+  // 不再整库清空重写，避免"合并期间刚好封存了新碎片"时把那一条冲掉
+  applyMerge(items, deadIds){
+    return new Promise((resolve,reject)=>{
+      const tx = this._db.transaction(STORE_FRAGMENTS,'readwrite');
+      const store = tx.objectStore(STORE_FRAGMENTS);
+      items.forEach(x=>store.put(x));
+      (deadIds||[]).forEach(id=>store.delete(id));
+      tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
     });
   },
 
@@ -1119,6 +1131,11 @@ const PBKDF2_ITER = 150000;
 const cloudSync = {
   busy:false,
   _timer:null,
+  lastError:null,        // 上次失败原因（按钮显示"待同步"，不再静默）
+  _pending:false,        // 同步进行中又被触发：排队补跑，不再丢弃
+  _pendingManual:false,
+  _lastAutoMsg:null,
+  _lastAutoAt:0,
 
   // ---------- 基础工具 ----------
   _enc:new TextEncoder(),
@@ -1239,7 +1256,8 @@ const cloudSync = {
     const token = await db.getSetting('syncToken');
     const password = await db.getSetting('syncPassword');
     if(!token || !password) return 'unconfigured';
-    if(this.busy) return 'busy';
+    // 同步进行中又被触发：记下来，本次跑完立刻补跑一次（V1.4.4 起不再丢弃）
+    if(this.busy){ this._pending = true; this._pendingManual = this._pendingManual || manual; return 'queued'; }
 
     this.busy = true;
     this._uiBusy(true);
@@ -1297,7 +1315,7 @@ const cloudSync = {
         const merged = this._merge(localItems, localTombs, remotePlain);
         mergedFragments = merged.fragments;
         mergedTombstones = merged.tombstones;
-        await db.replaceAll(mergedFragments);
+        await db.applyMerge(mergedFragments, mergedTombstones.map(t=>t.id));
         await db.setSetting('tombstones', mergedTombstones);
         state.items = mergedFragments;
         if(etag) await db.setSetting('syncEtag', etag);
@@ -1308,6 +1326,7 @@ const cloudSync = {
       const lastHash = await db.getSetting('syncStateHash');
       if(gistId && stateHash === lastHash){
         await db.setSetting('lastSyncAt', Date.now());
+        this.lastError = null;
         renderSyncUI();
         if(manual) toast('☁ 同步完成（无更新）');
         return 'ok';
@@ -1340,6 +1359,7 @@ const cloudSync = {
       await db.setSetting('syncEtag', ''); // 文件已被本机改写，旧 ETag 作废，下次完整拉取
       await db.setSetting('lastSyncAt', Date.now());
 
+      this.lastError = null;
       render.all();
       renderSyncUI();
       if(manual) toast('☁ 同步完成');
@@ -1350,11 +1370,19 @@ const cloudSync = {
         : /401|403/.test(err.message) ? '令牌无效、过期或缺少 gist 权限，请重新配置'
         : /Failed to fetch|NetworkError|load failed/i.test(err.message) ? '同步失败：网络不通（需要联网/VPN）'
         : '同步失败：' + err.message;
+      this.lastError = msg;
       if(manual) toast(msg);
+      else this._notifyAuto(msg);
       return {error:msg};
     }finally{
       this.busy = false;
       this._uiBusy(false);
+      // 排队等待的触发：补跑一次（手机反反复复点同步也不用再等 45 秒）
+      if(this._pending){
+        const again = this._pendingManual;
+        this._pending = false; this._pendingManual = false;
+        setTimeout(()=>this.sync({manual:again}), 400);
+      }
     }
   },
 
@@ -1395,11 +1423,21 @@ const cloudSync = {
   },
 
   // ---------- UI ----------
+  // 自动同步失败也要让用户看得见：同一条错误 5 分钟内只提示一次，避免反复打扰
+  _notifyAuto(msg){
+    const now = Date.now();
+    if(this._lastAutoMsg === msg && now - this._lastAutoAt < 300000) return;
+    this._lastAutoMsg = msg; this._lastAutoAt = now;
+    toast('☁ 自动同步未完成：' + msg);
+  },
+
   _uiBusy(b){
     const btn = $('#syncBtn');
     if(!btn) return;
     btn.disabled = b;
-    btn.textContent = b ? '同步中…' : '☁ 云同步';
+    btn.textContent = b ? '同步中…' : (this.lastError ? '☁ 待同步' : '☁ 云同步');
+    btn.title = (b || !this.lastError) ? '三端云同步（GitHub Gist 加密）'
+      : ('上次同步未成功：' + this.lastError + '（点一次重试）');
   },
 
   // 自测：加密往返 + 合并/墓碑逻辑（控制台可调用 cloudSync.selftest()）
@@ -1482,8 +1520,9 @@ async function renderSyncUI(){
   if(lastLine) lastLine.textContent = '上次成功同步：' + utils.formatTime(last);
   const btn = $('#syncBtn');
   if(btn && !cloudSync.busy){
-    btn.textContent = '☁ 云同步';
-    btn.title = last ? ('上次同步 '+utils.formatTime(last)) : '三端云同步（GitHub Gist 加密）';
+    btn.textContent = cloudSync.lastError ? '☁ 待同步' : '☁ 云同步';
+    btn.title = cloudSync.lastError ? ('上次同步未成功：' + cloudSync.lastError + '（点一次重试）')
+      : last ? ('上次同步 '+utils.formatTime(last)) : '三端云同步（GitHub Gist 加密）';
   }
 }
 

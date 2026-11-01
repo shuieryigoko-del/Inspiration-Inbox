@@ -296,12 +296,27 @@
     padding:9px 11px;border-radius:12px;
     background:var(--accent-soft);
     font-size:13px;color:var(--text);
+    cursor:pointer;transition:transform .12s,box-shadow .15s;   /* V2.0 第二步：可推入 */
   }
+  .link-kid:hover{transform:translateX(2px);box-shadow:0 2px 10px rgba(0,0,0,.06);}
+  .link-kid::after{content:'›';flex:0 0 auto;font-size:16px;color:var(--text-2);}
   .drawer-body .link-kid-thumb{
     width:40px;height:40px;flex:0 0 40px;border-radius:9px;
     object-fit:cover;margin:0;
   }
   .link-kid-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* V2.0 第二步：推入子素材——头部返回按钮 + 内容横向滑入，方向区分前进/后退 */
+  .drawer-back-btn{display:none;width:30px;height:30px;flex:0 0 auto;padding:0;font-size:18px;line-height:1;}
+  .drawer-back-btn.show{display:inline-flex;align-items:center;justify-content:center;}
+  @keyframes drawerSlideIn{from{opacity:0;transform:translateX(26px);}to{opacity:1;transform:none;}}
+  @keyframes drawerSlideBack{from{opacity:0;transform:translateX(-26px);}to{opacity:1;transform:none;}}
+  .drawer-body.slide-in{animation:drawerSlideIn .26s cubic-bezier(.22,.9,.3,1);}
+  .drawer-body.slide-back{animation:drawerSlideBack .26s cubic-bezier(.22,.9,.3,1);}
+  .drawer-origin{
+    margin-top:20px;padding:10px 12px;border-radius:10px;
+    background:var(--accent-soft);font-size:12px;line-height:1.6;color:var(--text-2);
+    display:flex;gap:6px;align-items:baseline;
+  }
 
   /* 手机端：底部抽屉两档——半屏 44vh（背后碎片流可见）/ 全屏 92vh（看长内容） */
   @media (max-width:768px){
@@ -402,7 +417,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.0.1</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.1.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -451,6 +466,7 @@
 <aside id="drawer" class="drawer" aria-hidden="true">
   <div class="drawer-grabber" id="drawerGrabber" role="button" aria-label="展开或收起详情"></div>
   <div class="drawer-head">
+    <button id="drawerBackBtn" class="icon-btn drawer-back-btn" title="返回上一层" aria-label="返回上一层">‹</button>
     <span class="drawer-title">碎片详情 · FRAGMENT</span>
     <button id="drawerEditBtn" class="icon-btn drawer-edit-btn" title="编辑这条碎片">编辑</button>
     <button id="drawerSizeBtn" class="icon-btn drawer-size-btn" title="展开/收起" aria-label="展开或收起">˄</button>
@@ -561,7 +577,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.1.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -772,6 +788,7 @@ const state = {
   pendingImage: null,      // 录入区待封存的图片 Base64
   pendingTags: [],        // 录入区已添加的标签
   drawerId: null,         // 当前抽屉中的碎片 id；null = 关闭
+  drawerPath: [],         // V2.0：抽屉内的推入栈，[父id] 或 [父id, 子id, ...]；长度>1 时可逐层返回
   editingId: null,        // V1.5：正在编辑的碎片 id；null = 非编辑态
   linkingParentId: null,  // V2.0：正在为其挑选子素材的父碎片 id；null = 非关联模式
   linkingSelected: []     // V2.0：关联模式下已勾选的子碎片 id 数组
@@ -996,6 +1013,12 @@ const render = {
 
   // 抽屉详情
   drawer(item){
+    // V2.0 第二步：按推入层级切换头部——第一层是碎片详情，推入层是「包含素材」并出现返回按钮
+    const depth = state.drawerPath.length;
+    const backBtn = $('#drawerBackBtn');
+    if(backBtn) backBtn.classList.toggle('show', depth > 1);
+    const titleEl = $('.drawer-title');
+    if(titleEl) titleEl.textContent = depth > 1 ? '包含素材 · FRAGMENT' : '碎片详情 · FRAGMENT';
     const body = $('#drawerBody');
     body.textContent = '';
     if(item.image){
@@ -1026,7 +1049,8 @@ const render = {
     body.appendChild(time);
 
     // V2.0：三空间同构——冷库/工作台/内核都能发起关联（父子必在同一空间，渲染层已按 space 隔离）
-    if(!state.linkingParentId){
+    // 只在最外层（父素材详情）给入口；推入到子素材后不再加层，避免"素材的素材的素材"
+    if(!state.linkingParentId && depth <= 1){
       const actions = document.createElement('div');
       actions.className = 'drawer-actions';
       const btn = document.createElement('button');
@@ -1055,6 +1079,9 @@ const render = {
         const row = document.createElement('div');
         row.className = 'link-kid';
         row.dataset.kidId = String(k.id);
+        row.title = '查看这块素材';
+        row.setAttribute('role','button');
+        row.tabIndex = 0;
         if(k.image){
           const thumb = document.createElement('img');
           thumb.className = 'link-kid-thumb';
@@ -1072,6 +1099,24 @@ const render = {
       sec.appendChild(list);
       body.appendChild(sec);
     }
+
+    // V2.0 第二步：推入层标注来源，明确「这块属于谁」，避免层级迷失
+    if(depth > 1){
+      const pid = state.drawerPath[depth-2];
+      const p = state.items.find(x=>x.id===pid);
+      if(p){
+        const origin = document.createElement('div');
+        origin.className = 'drawer-origin';
+        const label = document.createElement('span');
+        label.textContent = '↩ 属于：';
+        const pv = document.createElement('span');
+        const t = (p.content||'').trim() || (p.image ? '（图片碎片）' : '（空碎片）');
+        pv.textContent = t.length > 24 ? t.slice(0,24)+'…' : t;
+        origin.appendChild(label);
+        origin.appendChild(pv);
+        body.appendChild(origin);
+      }
+    }
   },
 
   openDrawer(id){
@@ -1079,6 +1124,8 @@ const render = {
     const item = state.items.find(x=>x.id===id);
     if(!item) return;
     state.drawerId = id;
+    state.drawerPath = [id];   // V2.0 第二步：从主流打开即重置推入栈
+    $('#drawerBody').classList.remove('slide-in','slide-back');   // 清掉上次残留的方向动画
     this.drawer(item);
     // 每次打开先回到半屏档（手机），保证背后碎片流可见
     $('#drawer').classList.remove('full');
@@ -1104,6 +1151,9 @@ const render = {
     $('#drawer').setAttribute('aria-hidden','true');
     $('#drawerEditBtn').style.display = 'none';
     state.drawerId = null;
+    state.drawerPath = [];        // V2.0 第二步：进编辑即退出推入栈，避免 Esc 时误触返回
+    const backBtn = $('#drawerBackBtn');
+    if(backBtn) backBtn.classList.remove('show');
     state.editingId = item.id;
     $('#contentInput').value = item.content || '';
     state.pendingTags = Array.isArray(item.tags) ? item.tags.slice() : [];
@@ -1147,11 +1197,53 @@ const render = {
     this.cancelEdit();            // 关抽屉即退出编辑，避免改到一半悬空
     $('#drawerEditBtn').style.display = 'none';
     state.drawerId = null;
+    state.drawerPath = [];        // V2.0 第二步：关抽屉即清空推入栈
+    const backBtn = $('#drawerBackBtn');
+    if(backBtn) backBtn.classList.remove('show');
     $('#drawer').classList.remove('open');
     $('#scrim').classList.remove('open');
     document.body.classList.remove('drawer-open');
     document.body.classList.remove('drawer-full');
     $('#drawer').setAttribute('aria-hidden','true');
+  },
+
+  /* ---------- V2.0 第二步：子素材推入 / 逐层返回 ---------- */
+
+  // 从「包含素材」推入子素材详情：抽屉不关闭，内容横向替换，父素材留在栈里
+  pushChild(id){
+    if(state.linkingParentId) return;
+    if(!state.drawerPath.length) return;
+    if(state.drawerPath[state.drawerPath.length-1] === id) return;
+    const item = state.items.find(x=>x.id===id);
+    if(!item){ toast('这块素材已不存在'); return; }
+    this.cancelEdit();            // 推入前退出编辑态，避免"编辑的其实是上一层"
+    state.drawerPath.push(id);
+    state.drawerId = id;
+    this.drawer(item);
+    this._slide('in');
+  },
+
+  // 逐层返回：回到栈中上一层；已在第一层则不动（关闭交给 ✕）
+  drawerBack(){
+    if(state.drawerPath.length <= 1) return;
+    state.drawerPath.pop();
+    const id = state.drawerPath[state.drawerPath.length-1];
+    const item = state.items.find(x=>x.id===id);
+    if(!item){ this.closeDrawer(); return; }   // 父素材已被删除：直接关抽屉，不留空壳
+    this.cancelEdit();
+    state.drawerId = id;
+    this.drawer(item);
+    this._slide('back');
+  },
+
+  // 方向性滑入：先移除再强制重排，连续推入也能重放动画
+  _slide(dir){
+    const body = $('#drawerBody');
+    if(!body) return;
+    body.classList.remove('slide-in','slide-back');
+    void body.offsetWidth;
+    body.classList.add(dir === 'back' ? 'slide-back' : 'slide-in');
+    body.scrollTop = 0;
   },
 
   /* ---------- V2.0 第一步：关联 + 隐藏 ---------- */
@@ -2140,15 +2232,24 @@ function bindEvents(){
   $('#drawerSizeBtn').addEventListener('click', ()=>render.toggleDrawerSize());
   $('#drawerEditBtn').addEventListener('click', ()=>render.startEdit());
   $('#cancelEditBtn').addEventListener('click', ()=>render.cancelEdit());
-  // V2.0：抽屉内的「+ 关联素材」按钮由抽屉体委托（每次渲染都是新节点）
+  // V2.0：抽屉内「+ 关联素材」与「包含素材」条目都由抽屉体委托（每次渲染都是新节点）
   $('#drawerBody').addEventListener('click', (e)=>{
-    if(e.target.closest('#drawerLinkBtn')) render.startLink();
+    if(e.target.closest('#drawerLinkBtn')){ render.startLink(); return; }
+    const kid = e.target.closest('.link-kid');   // V2.0 第二步：点条目推入子素材详情
+    if(kid) render.pushChild(Number(kid.dataset.kidId));
   });
+  $('#drawerBody').addEventListener('keydown', (e)=>{
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    const kid = e.target.closest('.link-kid');
+    if(kid){ e.preventDefault(); render.pushChild(Number(kid.dataset.kidId)); }
+  });
+  $('#drawerBackBtn').addEventListener('click', ()=>render.drawerBack());
   $('#linkConfirmBtn').addEventListener('click', ()=>render.linkConfirm());
   $('#linkCancelBtn').addEventListener('click', ()=>render.exitLink());
   document.addEventListener('keydown', (e)=>{
     if(e.key !== 'Escape') return;
     if(state.linkingParentId){ render.exitLink(); return; }  // 先退关联模式，再关抽屉
+    if(state.drawerPath.length > 1){ render.drawerBack(); return; }  // V2.0 第二步：Esc 先逐层返回
     render.closeDrawer();
   });
 

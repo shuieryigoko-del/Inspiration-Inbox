@@ -191,6 +191,46 @@
   .card:hover .card-del{opacity:1;}
   @media (hover:none){.card-del{opacity:.75;}}
   .card-del:hover{color:var(--danger);}
+
+  /* ---------- V2.0 父子关联（第一步：关联 + 隐藏） ---------- */
+  /* 关联模式下：卡片左上角出现勾选框，删除叉隐藏，点卡片=勾选 */
+  .card.linking{cursor:pointer;}
+  .card.linking:hover{transform:none;}   /* 勾选时不抬起，避免误触感 */
+  .card.linking .card-del{display:none;}
+  .card.linking.link-self{opacity:.5;cursor:default;}
+  .card.selected{outline:2px solid var(--accent);outline-offset:-2px;}
+  /* 勾选框故意不绝对定位：占正文上方独立一行，绝不压住碎片首行文字 */
+  .link-row{display:flex;align-items:center;gap:8px;padding:10px 12px 0;}
+  .link-check{
+    width:22px;height:22px;border-radius:50%;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--bg);border:1.5px solid var(--border);
+    color:var(--text-2);font-size:13px;font-weight:700;line-height:1;
+    transition:background .15s,border-color .15s,color .15s;
+  }
+  .card.selected .link-check{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .link-row-hint{font-size:12px;color:var(--text-2);}
+  /* 悬浮确认条：桌面居中靠下；手机端浮在半屏抽屉上方 */
+  .link-bar{
+    position:fixed;left:50%;bottom:24px;z-index:70;
+    display:flex;align-items:center;gap:10px;
+    padding:9px 12px 9px 16px;border-radius:999px;
+    background:var(--glass);border:1px solid var(--border);
+    -webkit-backdrop-filter:blur(18px) saturate(1.4);
+    backdrop-filter:blur(18px) saturate(1.4);
+    box-shadow:var(--shadow-hover);
+    transform:translate(-50%,140%);opacity:0;pointer-events:none;
+    transition:transform .28s cubic-bezier(.22,.9,.3,1),opacity .2s;
+  }
+  .link-bar.show{transform:translate(-50%,0);opacity:1;pointer-events:auto;}
+  .link-bar-text{font-size:13px;color:var(--text-2);white-space:nowrap;}
+  .link-bar .save-btn{margin:0;padding:8px 18px;font-size:13px;}
+  .link-bar .text-btn{padding:8px 10px;font-size:13px;}
+  @media (max-width:768px){
+    .link-bar{bottom:calc(44vh + 14px);max-width:calc(100vw - 28px);}
+    .link-bar-text{overflow:hidden;text-overflow:ellipsis;}
+  }
+
   .empty{
     text-align:center;color:var(--text-2);font-size:14px;
     padding:80px 20px;flex:1 1 100%;
@@ -221,6 +261,8 @@
     .topbar,.masonry{transition:padding-right .32s cubic-bezier(.22,.9,.3,1);}
     body.drawer-open .topbar,
     body.drawer-open .masonry{padding-right:calc(var(--drawer-w) + 14px);}
+    /* V2.0：关联确认条居中于抽屉之外的可视区，不与抽屉重叠 */
+    body.drawer-open .link-bar{left:calc((100% - var(--drawer-w)) / 2);}
   }
   /* 手机端底部抽屉的小抓条：桌面/平板不显示 */
   .drawer-grabber{display:none;}
@@ -233,6 +275,29 @@
   .drawer-content{font-size:16px;line-height:1.9;white-space:pre-wrap;word-break:break-word;}
   .drawer-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px;}
   .drawer-time{margin-top:22px;font-size:12px;color:var(--text-2);}
+  /* V2.0：抽屉内的关联入口与"包含素材"区 */
+  .drawer-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+  .drawer-link-btn{
+    padding:9px 16px;border-radius:12px;cursor:pointer;
+    border:1px dashed var(--border);background:transparent;
+    color:var(--accent);font-size:13px;font-family:inherit;letter-spacing:.5px;
+    transition:background .15s,border-color .15s;
+  }
+  .drawer-link-btn:hover{background:var(--accent-soft);border-color:var(--accent);}
+  .drawer-section{margin-top:26px;padding-top:18px;border-top:1px solid var(--border);}
+  .drawer-section-title{font-size:12px;color:var(--text-2);letter-spacing:1px;margin-bottom:12px;}
+  .link-kids{display:flex;flex-direction:column;gap:8px;}
+  .link-kid{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 11px;border-radius:12px;
+    background:var(--accent-soft);
+    font-size:13px;color:var(--text);
+  }
+  .drawer-body .link-kid-thumb{
+    width:40px;height:40px;flex:0 0 40px;border-radius:9px;
+    object-fit:cover;margin:0;
+  }
+  .link-kid-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
   /* 手机端：底部抽屉两档——半屏 44vh（背后碎片流可见）/ 全屏 92vh（看长内容） */
   @media (max-width:768px){
@@ -333,7 +398,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v1.5.1</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.0.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -389,6 +454,13 @@
   </div>
   <div class="drawer-body" id="drawerBody"></div>
 </aside>
+
+<!-- V2.0 关联模式的悬浮确认条（默认隐藏，进入关联模式后出现） -->
+<div id="linkBar" class="link-bar" role="dialog" aria-label="关联素材">
+  <span id="linkBarText" class="link-bar-text">勾选要归入的碎片</span>
+  <button id="linkConfirmBtn" class="save-btn" disabled>确认关联</button>
+  <button id="linkCancelBtn" class="text-btn">取消</button>
+</div>
 
 <!-- 云同步设置弹窗 -->
 <div id="syncModal" class="modal-mask">
@@ -485,7 +557,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '2.0.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -696,7 +768,9 @@ const state = {
   pendingImage: null,      // 录入区待封存的图片 Base64
   pendingTags: [],        // 录入区已添加的标签
   drawerId: null,         // 当前抽屉中的碎片 id；null = 关闭
-  editingId: null         // V1.5：正在编辑的碎片 id；null = 非编辑态
+  editingId: null,        // V1.5：正在编辑的碎片 id；null = 非编辑态
+  linkingParentId: null,  // V2.0：正在为其挑选子素材的父碎片 id；null = 非关联模式
+  linkingSelected: []     // V2.0：关联模式下已勾选的子碎片 id 数组
 };
 
 /* ============================================================
@@ -714,8 +788,12 @@ const render = {
 
   visibleItems(){
     const kw = state.search.trim().toLowerCase();
+    const alive = new Set(state.items.map(x=>x.id));
     return state.items
       .filter(x=>x.space === state.currentSpace)
+      // V2.0：已归入父素材的子碎片不在主流重复出现；若父素材已不存在则自动回到主流，
+      // 避免任何异常数据（旧备份/跨设备合并）造成碎片永久隐身——防丢底线。
+      .filter(x=>!x.parentId || !alive.has(x.parentId))
       .filter(x=>!kw
         || (x.content||'').toLowerCase().includes(kw)
         || (x.tags||[]).some(t=>t.toLowerCase().includes(kw)))
@@ -824,6 +902,31 @@ const render = {
     card.className = 'card';
     card.dataset.id = item.id;
 
+    // V2.0 关联模式：独立卡片左上角出现勾选框；父卡片自己灰显且不可勾
+    if(state.linkingParentId){
+      card.classList.add('linking');
+      if(item.id === state.linkingParentId){
+        card.classList.add('link-self');
+      }else{
+        const picked = state.linkingSelected.includes(item.id);
+        if(picked) card.classList.add('selected');
+        const row = document.createElement('div');
+        row.className = 'link-row';
+        const chk = document.createElement('span');
+        chk.className = 'link-check';
+        chk.dataset.action = 'toggle-link';
+        chk.setAttribute('role','checkbox');
+        chk.setAttribute('aria-checked', picked ? 'true' : 'false');
+        chk.textContent = picked ? '✓' : '';
+        const hint = document.createElement('span');
+        hint.className = 'link-row-hint';
+        hint.textContent = picked ? '已选中' : '点卡片选择';
+        row.appendChild(chk);
+        row.appendChild(hint);
+        card.appendChild(row);
+      }
+    }
+
     if(item.image){
       const wrap = document.createElement('div');
       wrap.className = 'card-img-wrap';
@@ -917,9 +1020,58 @@ const render = {
     time.className = 'drawer-time';
     time.textContent = `封存于 ${utils.formatTime(item.createdAt)} · 位于「${SPACE_NAMES[item.space]}」`;
     body.appendChild(time);
+
+    // V2.0：三空间同构——冷库/工作台/内核都能发起关联（父子必在同一空间，渲染层已按 space 隔离）
+    if(!state.linkingParentId){
+      const actions = document.createElement('div');
+      actions.className = 'drawer-actions';
+      const btn = document.createElement('button');
+      btn.id = 'drawerLinkBtn';
+      btn.className = 'drawer-link-btn';
+      btn.textContent = '+ 关联素材';
+      btn.title = '把其他碎片归入这一条';
+      actions.appendChild(btn);
+      body.appendChild(actions);
+    }
+
+    // V2.0：包含素材（第一步只做展示，证明数据完整保留；推入/剥离见后续步骤）
+    const kids = state.items
+      .filter(x=>x.parentId === item.id)
+      .sort((a,b)=>b.createdAt-a.createdAt);
+    if(kids.length){
+      const sec = document.createElement('div');
+      sec.className = 'drawer-section';
+      const title = document.createElement('div');
+      title.className = 'drawer-section-title';
+      title.textContent = `包含素材 · ${kids.length}`;
+      sec.appendChild(title);
+      const list = document.createElement('div');
+      list.className = 'link-kids';
+      kids.forEach(k=>{
+        const row = document.createElement('div');
+        row.className = 'link-kid';
+        row.dataset.kidId = String(k.id);
+        if(k.image){
+          const thumb = document.createElement('img');
+          thumb.className = 'link-kid-thumb';
+          thumb.src = k.image;
+          thumb.alt = '';
+          row.appendChild(thumb);
+        }
+        const txt = document.createElement('div');
+        txt.className = 'link-kid-text';
+        const preview = (k.content||'').trim() || (k.image ? '（图片碎片）' : '（空碎片）');
+        txt.textContent = preview.length > 60 ? preview.slice(0,60) + '…' : preview;
+        row.appendChild(txt);
+        list.appendChild(row);
+      });
+      sec.appendChild(list);
+      body.appendChild(sec);
+    }
   },
 
   openDrawer(id){
+    this.exitLink();   // V2.0：打开别的卡片前先退出关联模式，避免勾选态悬空
     const item = state.items.find(x=>x.id===id);
     if(!item) return;
     state.drawerId = id;
@@ -974,6 +1126,7 @@ const render = {
 
   // 手机端半屏/全屏两档切换（桌面右侧抽屉不受影响）
   toggleDrawerSize(){
+    if(state.linkingParentId) return;   // 关联模式下固定半屏，保证卡片可勾选
     const d = $('#drawer');
     const full = d.classList.toggle('full');
     document.body.classList.toggle('drawer-full', full);
@@ -986,6 +1139,7 @@ const render = {
   },
 
   closeDrawer(){
+    this.exitLink();              // V2.0：关抽屉即退出关联模式
     this.cancelEdit();            // 关抽屉即退出编辑，避免改到一半悬空
     $('#drawerEditBtn').style.display = 'none';
     state.drawerId = null;
@@ -994,6 +1148,80 @@ const render = {
     document.body.classList.remove('drawer-open');
     document.body.classList.remove('drawer-full');
     $('#drawer').setAttribute('aria-hidden','true');
+  },
+
+  /* ---------- V2.0 第一步：关联 + 隐藏 ---------- */
+
+  // 从抽屉发起关联：记录父卡片，进入勾选模式
+  startLink(){
+    const parent = state.items.find(x=>x.id===state.drawerId);
+    if(!parent) return;
+    state.linkingParentId = parent.id;
+    state.linkingSelected = [];
+    // 手机端回到半屏，保证背后碎片流可勾选
+    $('#drawer').classList.remove('full');
+    document.body.classList.remove('drawer-full');
+    this._syncSizeBtn(false);
+    this.linkBar();
+    this.cards();
+    toast('勾选要归入这条的碎片，再点「确认关联」');
+  },
+
+  exitLink(){
+    if(!state.linkingParentId) return;
+    state.linkingParentId = null;
+    state.linkingSelected = [];
+    this.linkBar();
+    this.cards();
+  },
+
+  toggleLinkSelect(id){
+    if(!state.linkingParentId || id === state.linkingParentId) return;
+    const i = state.linkingSelected.indexOf(id);
+    if(i >= 0) state.linkingSelected.splice(i,1);
+    else state.linkingSelected.push(id);
+    this.linkBar();
+    this.cards();
+  },
+
+  linkBar(){
+    const bar = $('#linkBar');
+    if(!bar) return;
+    const on = !!state.linkingParentId;
+    bar.classList.toggle('show', on);
+    document.body.classList.toggle('linking', on);
+    if(!on) return;
+    const n = state.linkingSelected.length;
+    $('#linkBarText').textContent = n ? `已选 ${n} 块` : '勾选要归入的碎片';
+    $('#linkConfirmBtn').disabled = n === 0;
+  },
+
+  async linkConfirm(){
+    const parentId = state.linkingParentId;
+    if(!parentId) return;
+    const ids = state.linkingSelected.slice();
+    if(!ids.length){ toast('先勾选要关联的碎片'); return; }
+    const parent = state.items.find(x=>x.id===parentId);
+    const now = Date.now();
+    for(const id of ids){
+      const it = state.items.find(x=>x.id===id);
+      if(!it) continue;
+      it.parentId = parentId;   // 只加一个字段，原始记录一条都不删
+      it.updatedAt = now;       // 关键：LWW 靠它把关联关系同步到其他设备
+      await db.updateItem(it);
+    }
+    if(parent){
+      parent.updatedAt = now;
+      await db.updateItem(parent);
+    }
+    state.linkingParentId = null;
+    state.linkingSelected = [];
+    this.linkBar();
+    this.cards();
+    if(parent) this.drawer(parent);
+    cloudSync.schedule();       // 未配置同步时静默无请求
+    backup.run(false);
+    toast(`已关联 ${ids.length} 块碎片`);
   },
 
   theme(){
@@ -1871,10 +2099,26 @@ function bindEvents(){
     const cardEl = e.target.closest('.card');
     if(!cardEl) return;
     const id = Number(cardEl.dataset.id);
+
+    // V2.0 关联模式：点卡片=勾选/取消勾选，不打开抽屉、不允许删除
+    if(state.linkingParentId){
+      if(cardEl.classList.contains('link-self')) return;
+      render.toggleLinkSelect(id);
+      return;
+    }
+
     if(delBtn){
       e.stopPropagation();
       const item = state.items.find(x=>x.id===id);
       if(!confirm(`确定删除这块碎片吗？\n\n「${(item.content||'（图片碎片）').slice(0,30)}…」\n\n删除后会同步到其他设备。`)) return;
+      // V2.0：删父素材前先把它的子素材放回主流，否则子素材会永远看不见（防丢底线）
+      const now = Date.now();
+      const kids = state.items.filter(x=>x.parentId===id);
+      for(const k of kids){
+        k.parentId = null;
+        k.updatedAt = now;
+        await db.updateItem(k);
+      }
       await db.deleteItem(id);
       await cloudSync.tombstone(id); // 记墓碑并触发云同步（未开启同步时无副作用）
       state.items = state.items.filter(x=>x.id!==id);
@@ -1892,7 +2136,17 @@ function bindEvents(){
   $('#drawerSizeBtn').addEventListener('click', ()=>render.toggleDrawerSize());
   $('#drawerEditBtn').addEventListener('click', ()=>render.startEdit());
   $('#cancelEditBtn').addEventListener('click', ()=>render.cancelEdit());
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') render.closeDrawer(); });
+  // V2.0：抽屉内的「+ 关联素材」按钮由抽屉体委托（每次渲染都是新节点）
+  $('#drawerBody').addEventListener('click', (e)=>{
+    if(e.target.closest('#drawerLinkBtn')) render.startLink();
+  });
+  $('#linkConfirmBtn').addEventListener('click', ()=>render.linkConfirm());
+  $('#linkCancelBtn').addEventListener('click', ()=>render.exitLink());
+  document.addEventListener('keydown', (e)=>{
+    if(e.key !== 'Escape') return;
+    if(state.linkingParentId){ render.exitLink(); return; }  // 先退关联模式，再关抽屉
+    render.closeDrawer();
+  });
 
   // —— 日/夜模式 ——
   $('#themeBtn').addEventListener('click', async ()=>{

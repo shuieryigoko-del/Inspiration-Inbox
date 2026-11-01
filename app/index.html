@@ -227,8 +227,12 @@
   .link-bar .save-btn{margin:0;padding:8px 18px;font-size:13px;}
   .link-bar .text-btn{padding:8px 10px;font-size:13px;}
   @media (max-width:768px){
-    .link-bar{bottom:calc(44vh + 14px);max-width:calc(100vw - 28px);}
-    .link-bar-text{overflow:hidden;text-overflow:ellipsis;}
+    .link-bar{bottom:calc(44vh + 14px);max-width:calc(100vw - 24px);padding:8px 10px 8px 14px;gap:8px;}
+    /* min-width:0 是关键：不加它 flex 子项不会收缩，文本会把按钮挤到换行、整体溢出屏幕 */
+    .link-bar-text{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto;}
+    .link-bar .save-btn,.link-bar .text-btn{flex:0 0 auto;white-space:nowrap;}
+    .link-bar .save-btn{padding:8px 14px;}
+    .link-bar .text-btn{padding:8px 8px;}
   }
 
   .empty{
@@ -398,7 +402,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.0.0</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.0.1</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -557,7 +561,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';

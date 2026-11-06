@@ -180,6 +180,15 @@
   .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
   .card-tag{font-size:11px;color:var(--accent);background:var(--accent-soft);
     padding:2px 9px;border-radius:999px;}
+  /* V2.0 第四步：搜索穿透命中的子素材，卡头标注它属于谁——
+     说明这块平时藏在父素材里、因搜索才出现，避免"凭空多出一条"的错觉 */
+  .card-via{
+    display:inline-flex;align-items:center;gap:5px;max-width:100%;
+    margin-bottom:8px;padding:3px 9px;border-radius:999px;
+    background:var(--accent-soft);color:var(--accent);
+    font-size:11px;line-height:1.5;
+  }
+  .card-via-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .card-meta{display:flex;justify-content:space-between;align-items:center;
     margin-top:10px;font-size:11px;color:var(--text-2);}
   .card-del{
@@ -427,7 +436,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.2.0</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.3.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -587,7 +596,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -820,11 +829,16 @@ const render = {
   visibleItems(){
     const kw = state.search.trim().toLowerCase();
     const alive = new Set(state.items.map(x=>x.id));
+    // 被父素材收纳（父素材仍存在）= 平时应当隐藏的子碎片
+    const folded = x => !!x.parentId && alive.has(x.parentId);
     return state.items
       .filter(x=>x.space === state.currentSpace)
       // V2.0：已归入父素材的子碎片不在主流重复出现；若父素材已不存在则自动回到主流，
       // 避免任何异常数据（旧备份/跨设备合并）造成碎片永久隐身——防丢底线。
-      .filter(x=>!x.parentId || !alive.has(x.parentId))
+      // V2.0 第四步（搜索穿透）：一旦有搜索词，被收纳的子碎片也参与命中——
+      // 否则"明明存过却搜不到的"会让人以为数据丢了。命中后卡片会标注它属于谁。
+      // 但关联模式下不穿透：否则正在挑素材时，别人的子素材会冒出来、被勾中就静默改挂父级。
+      .filter(x=>!folded(x) || (!!kw && !state.linkingParentId))
       .filter(x=>!kw
         || (x.content||'').toLowerCase().includes(kw)
         || (x.tags||[]).some(t=>t.toLowerCase().includes(kw)))
@@ -842,6 +856,7 @@ const render = {
     const box = $('#masonry');
     box.textContent = '';
     const list = this.visibleItems();
+    const byId = new Map(state.items.map(x=>[x.id,x]));   // V2.0 第四步：查父素材，用于标注来源
     if(!list.length){
       const empty = document.createElement('div');
       empty.className = 'empty';
@@ -868,7 +883,7 @@ const render = {
       for(let i=1;i<cols.length;i++){
         if(cols[i].scrollHeight < target.scrollHeight) target = cols[i];
       }
-      target.appendChild(this.card(item));
+      target.appendChild(this.card(item, byId));
     });
   },
 
@@ -928,7 +943,7 @@ const render = {
   },
 
   // 单张卡片（全部用 createElement + textContent，杜绝 XSS）
-  card(item){
+  card(item, byId){
     const card = document.createElement('article');
     card.className = 'card';
     card.dataset.id = item.id;
@@ -985,6 +1000,24 @@ const render = {
 
     const body = document.createElement('div');
     body.className = 'card-body';
+
+    // V2.0 第四步：搜索穿透命中的子素材，卡头标注「关联自父素材」。
+    // 判据与 visibleItems 的隐藏条件一致：有搜索词 + 这条挂在父素材下 + 父素材确实存在。
+    const viaParent = (state.search.trim() && item.parentId && byId && byId.get(item.parentId)) || null;
+    if(viaParent){
+      const pt = (viaParent.content||'').trim() || (viaParent.image ? '（图片碎片）' : '（空碎片）');
+      const via = document.createElement('div');
+      via.className = 'card-via';
+      via.title = '这块素材已归入父素材，因搜索命中而显示';
+      const icon = document.createElement('span');
+      icon.textContent = '🔗';
+      const vtxt = document.createElement('span');
+      vtxt.className = 'card-via-text';
+      vtxt.textContent = `关联自「${pt.length > 14 ? pt.slice(0,14)+'…' : pt}」`;
+      via.appendChild(icon);
+      via.appendChild(vtxt);
+      body.appendChild(via);
+    }
 
     const content = document.createElement('div');
     content.className = 'card-content';
@@ -1148,7 +1181,11 @@ const render = {
     const item = state.items.find(x=>x.id===id);
     if(!item) return;
     state.drawerId = id;
-    state.drawerPath = [id];   // V2.0 第二步：从主流打开即重置推入栈
+    // V2.0 第二步：从主流打开即重置推入栈。
+    // 第四步补一条：若打开的是搜索穿透出来的子素材，栈里连父级一起补上，
+    // 这样左上角 ‹ 能返回父素材，而不是只能直接关掉。
+    const dad = item.parentId ? state.items.find(x=>x.id===item.parentId) : null;
+    state.drawerPath = dad ? [dad.id, id] : [id];
     $('#drawerBody').classList.remove('slide-in','slide-back');   // 清掉上次残留的方向动画
     this.drawer(item);
     // 每次打开先回到半屏档（手机），保证背后碎片流可见

@@ -117,6 +117,16 @@
   .tab .tab-sub{font-size:10px;opacity:.7;margin-left:6px;letter-spacing:0;}
   .tab.active{background:var(--accent);color:#fff;border-color:transparent;
     box-shadow:0 6px 18px var(--accent-soft);}
+  /* V2.0 第五步：上帝视角开关——视角类控件，放在空间 Tab 这一排的右端 */
+  .god-toggle{
+    margin-left:auto;padding:9px 15px;border-radius:999px;font-size:13px;
+    color:var(--text-2);background:var(--card);border:1px solid var(--border);
+    box-shadow:var(--shadow);white-space:nowrap;
+    transition:color .2s ease,background .2s ease,border-color .2s ease;
+  }
+  .god-toggle:hover{color:var(--text);}
+  .god-toggle.on{background:var(--accent);color:#fff;border-color:transparent;
+    box-shadow:0 6px 18px var(--accent-soft);}
 
   /* ---------- 录入区 ---------- */
   .composer{
@@ -421,7 +431,9 @@
     .backup-reminder-mini{display:inline;font-size:11px;color:var(--text-2);margin-left:auto;}
     .backup-reminder-mini.warn{color:var(--danger);font-weight:600;}
     .save-btn{margin-left:0;}
-    .tabs{padding:14px 14px 4px;}
+    .tabs{padding:14px 14px 4px;flex-wrap:wrap;}
+    .tab{flex:0 0 auto;}
+    .god-toggle{font-size:12px;padding:7px 11px;}
     .masonry{padding:0 14px;}
     .composer{width:calc(100% - 28px);}
     body{padding-bottom:calc(40px + env(safe-area-inset-bottom));}
@@ -436,7 +448,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.3.0</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.4.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -456,6 +468,7 @@
   <button class="tab" data-space="cold">冷库<span class="tab-sub">Cold</span></button>
   <button class="tab active" data-space="workspace">工作台<span class="tab-sub">Workspace</span></button>
   <button class="tab" data-space="core">内核<span class="tab-sub">Core</span></button>
+  <button id="godViewBtn" class="god-toggle" aria-pressed="false" title="把归入父素材的子碎片也平铺到主流，方便一眼看全">⌗ 上帝视角</button>
 </nav>
 
 <section class="composer">
@@ -596,7 +609,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -810,7 +823,8 @@ const state = {
   drawerPath: [],         // V2.0：抽屉内的推入栈，[父id] 或 [父id, 子id, ...]；长度>1 时可逐层返回
   editingId: null,        // V1.5：正在编辑的碎片 id；null = 非编辑态
   linkingParentId: null,  // V2.0：正在为其挑选子素材的父碎片 id；null = 非关联模式
-  linkingSelected: []     // V2.0：关联模式下已勾选的子碎片 id 数组
+  linkingSelected: [],    // V2.0：关联模式下已勾选的子碎片 id 数组
+  godView: false          // V2.0：上帝视角——把被收纳的子素材平铺进主流；不持久化，刷新即复位
 };
 
 /* ============================================================
@@ -837,8 +851,10 @@ const render = {
       // 避免任何异常数据（旧备份/跨设备合并）造成碎片永久隐身——防丢底线。
       // V2.0 第四步（搜索穿透）：一旦有搜索词，被收纳的子碎片也参与命中——
       // 否则"明明存过却搜不到的"会让人以为数据丢了。命中后卡片会标注它属于谁。
-      // 但关联模式下不穿透：否则正在挑素材时，别人的子素材会冒出来、被勾中就静默改挂父级。
-      .filter(x=>!folded(x) || (!!kw && !state.linkingParentId))
+      // V2.0 第五步（上帝视角）：开关打开时同样平铺出来，不必先搜索。
+      // 两者在关联模式下都不生效：否则正在挑素材时别人的子素材会冒出来，
+      // 一旦被勾中就会把它从原父素材静默改挂走（parentId 是单值字段）。
+      .filter(x=>!folded(x) || ((!!kw || state.godView) && !state.linkingParentId))
       .filter(x=>!kw
         || (x.content||'').toLowerCase().includes(kw)
         || (x.tags||[]).some(t=>t.toLowerCase().includes(kw)))
@@ -1001,9 +1017,10 @@ const render = {
     const body = document.createElement('div');
     body.className = 'card-body';
 
-    // V2.0 第四步：搜索穿透命中的子素材，卡头标注「关联自父素材」。
-    // 判据与 visibleItems 的隐藏条件一致：有搜索词 + 这条挂在父素材下 + 父素材确实存在。
-    const viaParent = (state.search.trim() && item.parentId && byId && byId.get(item.parentId)) || null;
+    // V2.0 第四步：搜索穿透 / 第五步：上帝视角——被收纳的子素材出现在主流时，
+    // 卡头标注「关联自父素材」，说明它平时藏在父素材里，不是重复条目。
+    const showingFolded = !!(state.search.trim() || state.godView);
+    const viaParent = (showingFolded && item.parentId && byId && byId.get(item.parentId)) || null;
     if(viaParent){
       const pt = (viaParent.content||'').trim() || (viaParent.image ? '（图片碎片）' : '（空碎片）');
       const via = document.createElement('div');
@@ -1342,6 +1359,23 @@ const render = {
     cloudSync.schedule();
     backup.run(false);
     toast('已放回主流，素材仍完整保留');
+  },
+
+  /* ---------- V2.0 第五步：上帝视角 ---------- */
+
+  // 把被收纳的子素材平铺进主流，和父素材按时间混排；再点一次恢复折叠。
+  // 纯视图开关：不改任何数据，刷新页面即复位（避免"为什么多出一堆卡"的困惑）。
+  toggleGod(){
+    state.godView = !state.godView;
+    const btn = $('#godViewBtn');
+    if(btn){
+      btn.classList.toggle('on', state.godView);
+      btn.setAttribute('aria-pressed', state.godView ? 'true' : 'false');
+      btn.textContent = state.godView ? '⌗ 上帝视角 · 开' : '⌗ 上帝视角';
+    }
+    this.cards();
+    if(state.godView && state.linkingParentId) toast('关联模式下仍只显示主素材，退出关联后才会平铺');
+    else toast(state.godView ? '已平铺：子素材按时间混入主流，带 🔗 标记' : '已恢复：子素材回到各自父素材下');
   },
 
   /* ---------- V2.0 第一步：关联 + 隐藏 ---------- */
@@ -2286,6 +2320,9 @@ function bindEvents(){
     state.search = e.target.value;
     render.cards();
   },180));
+
+  // —— V2.0 第五步：上帝视角开关（纯视图，不改数据） ——
+  $('#godViewBtn').addEventListener('click', ()=>render.toggleGod());
 
   // —— 瀑布流事件委托：点卡片开抽屉，点 ✕ 删除 ——
   $('#masonry').addEventListener('click', async (e)=>{

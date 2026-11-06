@@ -448,7 +448,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.4.0</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.4.1</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -609,7 +609,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1548,15 +1548,19 @@ const backup = {
     }
     const json = JSON.stringify(this.buildPayload(items), null, 2);
 
-    // 自动备份（封存后触发）在未授权文件夹时一律不弹窗、不下载：
-    // 否则浏览器若开了"下载前询问保存位置"会每存一条弹一次另存为，静默下载也会堆积文件。
-    // 数据安全交给：顶部"X 天未备份"红色提醒 + 手动「导出备份」+ 云同步（V1.4.1）
-    if(!manual && !(await db.getSetting('backupDirHandle'))){
-      return 'skipped';
+    // 自动备份（封存后触发）只在"桌面端 + 已授权文件夹"时才执行，其余情况一律静默跳过：
+    // ① 手机上没有 File System Access API，唯一能落地的路径就是触发一次系统下载，
+    //    华为浏览器会为此弹「立即下载 / 忽略」确认框——每改一条弹一次
+    // ② 浏览器若开了"下载前询问保存位置"，也会每存一条弹一次另存为
+    // 数据安全交给：顶部"X 天未备份"提醒 + 手动「导出备份」+ 云同步（V1.4.1）
+    if(!manual){
+      if(!('showDirectoryPicker' in window)) return 'skipped';
+      if(!(await db.getSetting('backupDirHandle'))) return 'skipped';
     }
 
     const mode = await this._deliver(json, manual);
     if(mode === 'cancelled') return 'cancelled';
+    if(mode === 'skipped') return 'skipped';   // 没真正落地，就不要写成"已备份"
 
     await db.setSetting('lastBackupHash', fingerprint);
     await db.setSetting('lastExportAt', Date.now());
@@ -1602,7 +1606,10 @@ const backup = {
       }
     }
 
-    // 3) 兜底：普通下载（安卓 Chrome/桌面浏览器静默进下载目录）
+    // 3) 兜底：普通下载。只给手动导出用。
+    //    自动备份绝不走这条路：手机上每次改动都会因此弹一次系统下载确认（华为浏览器实测），
+    //    宁可静默失败，让顶部的"X 天未备份"提醒去催用户。
+    if(!manual) return 'skipped';
     utils.download('inspiration-backup-latest.json', json);
     return 'download';
   },
@@ -2673,6 +2680,13 @@ async function init(){
     render.all();
     render.watchColumns(); // 容器宽度变化（横竖屏）跨断点时重建列（V1.4.1）
     bindEvents();
+
+    // 手机浏览器没有 File System Access API：历史遗留的文件夹授权记录会让自动备份
+    // 误判成"已授权"，从而每次改动都触发一次系统下载确认（华为浏览器实测）。
+    // 这里主动清掉，保证手机端永远走"静默跳过"。
+    if(!('showDirectoryPicker' in window) && await db.getSetting('backupDirHandle')){
+      await db.setSetting('backupDirHandle', null);
+    }
 
     // 已授权过文件夹时，按钮显示已连接
     if(await db.getSetting('backupDirHandle')){

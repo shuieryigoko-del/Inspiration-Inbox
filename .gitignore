@@ -18,3 +18,9 @@ desktop.ini
 
 # Word 为提交前由 md 临时生成的成品，不长期保留（md2docx.py 按需生成）
 *.docx
+
+# 视频抽帧等临时工作目录
+.tmp_frames/
+
+# WorkBuddy 本地项目数据（记忆、缓存）
+.workbuddy/

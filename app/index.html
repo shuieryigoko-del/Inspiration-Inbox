@@ -268,7 +268,10 @@
   /* 抽屉宽度同时用于"抽屉本体"和"打开时给背景让出的空间"（V1.4.1） */
   :root{--drawer-w:clamp(340px,40vw,580px);}
   .drawer{
-    position:fixed;top:0;right:0;height:100vh;width:var(--drawer-w);
+    /* V2.4.2：vh → dvh。手机浏览器（vivo/华为等）地址栏与底栏常驻时，
+       vh 取的是"大视口"（不含浏览器 UI 的高度），抽屉底部会被底栏压住约 56px；
+       dvh 跟随真实可视区，抽屉正好停在底栏上方。不支持的浏览器回退到 vh。 */
+    position:fixed;top:0;right:0;height:100vh;height:100dvh;width:var(--drawer-w);
     background:var(--glass);
     -webkit-backdrop-filter:blur(20px) saturate(1.5);
     backdrop-filter:blur(20px) saturate(1.5);
@@ -350,14 +353,15 @@
   /* 手机端：底部抽屉两档——半屏 44vh（背后碎片流可见）/ 全屏 92vh（看长内容） */
   @media (max-width:768px){
     .drawer{
-      top:auto;bottom:0;left:0;right:0;width:100%;max-width:none;height:44vh;min-width:0;
+      top:auto;bottom:0;left:0;right:0;width:100%;max-width:none;
+      height:44vh;height:44dvh;min-width:0;
       border-radius:22px 22px 0 0;border-left:none;
       border-top:1px solid var(--border);
       transform:translateY(105%);
       transition:transform .32s cubic-bezier(.22,.9,.3,1),height .32s cubic-bezier(.22,.9,.3,1);
     }
     .drawer.open{transform:translateY(0);}
-    .drawer.full{height:92vh;}
+    .drawer.full{height:92vh;height:92dvh;}
     .drawer-grabber{
       display:flex;align-items:center;justify-content:center;
       height:22px;flex:0 0 22px;cursor:pointer;touch-action:manipulation;
@@ -382,7 +386,7 @@
   }
   .modal-mask.open{display:flex;}
   .sync-card{
-    width:100%;max-width:430px;max-height:88vh;overflow-y:auto;
+    width:100%;max-width:430px;max-height:88vh;max-height:88dvh;overflow-y:auto;
     background:var(--card);border:1px solid var(--border);border-radius:18px;
     box-shadow:var(--shadow-hover);padding:24px;
   }
@@ -423,7 +427,13 @@
   .backup-reminder-mini{display:none;}
   /* 手机端细节：窄屏下顶栏自动换行不溢出；底部留出手势条安全区 */
   @media (max-width:600px){
-    .topbar{padding-left:14px;padding-right:14px;gap:10px;}
+    /* V2.4.2：窄屏顶栏改为不透明。
+       v2.4.1 之前是 rgba(255,255,255,.72) + blur(14px)，滚动时下面的紫色「工作台」Tab、
+       卡片删除叉会透出来，看起来像按钮被切了一半（手机真机录屏实证）。
+       副作用是好的：华为/鸿蒙机上 backdrop-filter 很吃性能，去掉后滚动更跟手。 */
+    .topbar{padding-left:14px;padding-right:14px;gap:10px;
+      background:var(--bg);
+      -webkit-backdrop-filter:none;backdrop-filter:none;}
     .logo{font-size:15px;}
     .search-box input{font-size:16px;}
     .search-box{order:3;flex-basis:100%;max-width:none;}
@@ -431,13 +441,25 @@
     .backup-reminder-mini{display:inline;font-size:11px;color:var(--text-2);margin-left:auto;}
     .backup-reminder-mini.warn{color:var(--danger);font-weight:600;}
     .save-btn{margin-left:0;}
-    .tabs{padding:14px 14px 4px;flex-wrap:wrap;}
-    .tab{flex:0 0 auto;}
-    .god-toggle{font-size:12px;padding:7px 11px;}
+    /* V2.4.2：Tab 行必须保持一行。原来 flex-wrap:wrap 会让「内核」被挤到第二行，
+       第一行再滚到顶栏下面时只剩半截，视觉上像布局错乱。
+       省空间的三个手段：隐藏英文副标题（纯装饰）、收紧内边距、横向滚动兜底。
+       320px 极窄屏放不下时整行可左右滑，绝不换行。 */
+    .tabs{padding:12px 14px 12px;flex-wrap:nowrap;
+      overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+    .tabs::-webkit-scrollbar{display:none;}
+    .tab{flex:0 0 auto;padding:8px 14px;font-size:13px;}
+    .tab .tab-sub{display:none;}
+    .god-toggle{font-size:12px;padding:7px 11px;flex:0 0 auto;}
     .masonry{padding:0 14px;}
     .composer{width:calc(100% - 28px);}
     body{padding-bottom:calc(40px + env(safe-area-inset-bottom));}
   }
+  /* V2.4.2 备注：曾试过在顶栏加「⛶ 全屏」按钮（Fullscreen API），已撤掉。
+     依据华为官方支持文档（content/zh-cn16089660），华为浏览器 6.1.3.300+ 自带
+     「∷ → 全屏浏览」，一键隐藏地址栏和底部工具栏且不随滑动弹回，比网页自己调 API
+     更彻底、退出也更自然（系统返回即可）。重复造轮子只会让顶栏更挤。 */
+
   /* 独立 PWA 窗口里给顶部状态栏留出主题色背景 */
   @media (display-mode:standalone){
     .topbar{padding-top:calc(10px + env(safe-area-inset-top));}
@@ -448,7 +470,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.4.1</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.4.2</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -568,9 +590,11 @@
     <div id="installViewAndroid" class="install-view">
       <p class="hint">安装弹窗没有自动出现时，可以用浏览器菜单手动添加：</p>
       <ol class="install-steps">
-        <li><b>华为浏览器：</b>点底部菜单（四个点）→「添加至主屏幕」；若菜单里有「安装应用」，优先点它（装好后全屏、没有地址栏）。</li>
-        <li><b>出境易里的 Edge：</b>点菜单「⋯」→「添加到手机」。如果这一项是灰色：到系统「设置 → 应用和服务 → 应用管理 → 出境易 → 权限」里允许「创建桌面快捷方式」，再回来重试。</li>
-        <li><b>其他浏览器：</b>菜单「⋮」→「安装应用」或「添加到主屏幕」。</li>
+        <li><b>华为浏览器（鸿蒙）：</b>点网页右下角的 <b>∷</b> →「添加至桌面」。这样生成的是<b>书签快捷方式</b>，打开时地址栏和底部工具栏仍然在——鸿蒙没有 PWA 独立窗口机制，官方已确认这一点，不是操作问题。</li>
+        <li><b>想让它全屏（鸿蒙）：</b>同一个 <b>∷</b> 菜单里点「<b>全屏浏览</b>」，地址栏和底部工具栏会一起收起，而且不会随上下滑动弹回来；退出时左右滑一下（系统返回）即可。</li>
+        <li><b>想少点两次：</b>华为浏览器「我的 → 设置 → 浏览设置」里打开「<b>滑动隐藏底部工具栏</b>」，之后向下滑动网页时上下两条栏会自动收起。</li>
+        <li><b>vivo / 小米 / 其他浏览器：</b>菜单「⋮」或「∷」→「添加到桌面」；若菜单里有「安装应用 / 安装到主屏幕」，优先点它（部分机型能装成不带地址栏的独立窗口）。</li>
+        <li><b>出境易里的 Edge / Chrome：</b>容器里的应用拿不到「创建桌面快捷方式」权限，所以菜单里找不到「添加到桌面」是正常的；要用它们，只能在出境易内部打开网页。</li>
       </ol>
       <p class="hint">请直接在浏览器里打开本网页再操作，不要从桌面旧图标点进来；装好新图标后，旧的书签式图标（顶部带地址栏的那个）可以删掉。</p>
       <p class="hint"><b>提示"已添加/已下载"但桌面上找不到图标，按顺序排查：</b></p>
@@ -609,7 +633,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.4.1';
+const APP_VERSION = '2.4.2';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -2474,6 +2498,12 @@ function bindEvents(){
     if(pwa.ios) showInstallButton();
     else if(pwa.touch) setTimeout(showInstallButton, 1200);
   }
+
+  /* V2.4.2：不自己做全屏按钮了。
+     原因：华为浏览器 6.1.3.300+ 自带「∷ → 全屏浏览」（官方文档 zh-cn16089660），
+     一键连地址栏带底部工具栏一起收起，且不会随滑动弹回；退出用系统返回，比
+     Fullscreen API 自然得多。鸿蒙侧也没有 PWA 独立窗口，"添加到桌面"就是书签
+     快捷方式——这是系统机制，网页端无法改变，只能靠浏览器自己的全屏模式规避。 */
 
   // —— 云同步：按钮、弹窗、配置 ——
   $('#syncBtn').addEventListener('click', async ()=>{

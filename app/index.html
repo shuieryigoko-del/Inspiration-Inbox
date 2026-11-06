@@ -317,6 +317,16 @@
     background:var(--accent-soft);font-size:12px;line-height:1.6;color:var(--text-2);
     display:flex;gap:6px;align-items:baseline;
   }
+  /* V2.0 第三步：剥离入口——两段式确认，不依赖原生 confirm（内嵌预览会静默屏蔽） */
+  .drawer-unlink{display:flex;gap:10px;margin-top:22px;}
+  .unlink-btn{
+    padding:9px 16px;border-radius:12px;cursor:pointer;
+    border:1px dashed var(--border);background:transparent;
+    color:var(--text-2);font-size:13px;font-family:inherit;letter-spacing:.5px;
+    transition:background .15s,border-color .15s,color .15s;
+  }
+  .unlink-btn:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
+  .unlink-btn.arm{background:rgba(214,69,69,.12);border-color:var(--danger);border-style:solid;color:var(--danger);}
 
   /* 手机端：底部抽屉两档——半屏 44vh（背后碎片流可见）/ 全屏 92vh（看长内容） */
   @media (max-width:768px){
@@ -417,7 +427,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.1.0</small></div>
+  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.2.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -577,7 +587,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1013,6 +1023,7 @@ const render = {
 
   // 抽屉详情
   drawer(item){
+    clearTimeout(this._unlinkTimer);   // V2.0 第三步：重渲染即撤销未完成的「待确认」倒计时
     // V2.0 第二步：按推入层级切换头部——第一层是碎片详情，推入层是「包含素材」并出现返回按钮
     const depth = state.drawerPath.length;
     const backBtn = $('#drawerBackBtn');
@@ -1116,6 +1127,19 @@ const render = {
         origin.appendChild(pv);
         body.appendChild(origin);
       }
+    }
+
+    // V2.0 第三步：这条素材挂在父素材下时，提供剥离入口（只清 parentId，原记录一条不删）
+    if(item.parentId && !state.linkingParentId){
+      const wrap = document.createElement('div');
+      wrap.className = 'drawer-unlink';
+      const unlinkBtn = document.createElement('button');
+      unlinkBtn.id = 'drawerUnlinkBtn';
+      unlinkBtn.className = 'unlink-btn';
+      unlinkBtn.textContent = '⛓ 解除关联，放回主流';
+      unlinkBtn.title = '只清空关联关系，不删除这条素材';
+      wrap.appendChild(unlinkBtn);
+      body.appendChild(wrap);
     }
   },
 
@@ -1244,6 +1268,43 @@ const render = {
     void body.offsetWidth;
     body.classList.add(dir === 'back' ? 'slide-back' : 'slide-in');
     body.scrollTop = 0;
+  },
+
+  // V2.0 第三步：剥离——清空 parentId 让子素材回到主流，原始记录一条不删
+  // 两段式确认：第一次点击只进入待确认态（3 秒自动撤销），再点一次才真正执行
+  async unlink(){
+    const item = state.items.find(x=>x.id===state.drawerId);
+    if(!item || !item.parentId){ toast('这条素材没有关联关系'); return; }
+    const btn = $('#drawerUnlinkBtn');
+    if(btn && !btn.classList.contains('arm')){
+      btn.classList.add('arm');
+      btn.textContent = '⚠ 再点一次确认解除';
+      clearTimeout(this._unlinkTimer);
+      this._unlinkTimer = setTimeout(()=>{
+        const b = $('#drawerUnlinkBtn');
+        if(b){ b.classList.remove('arm'); b.textContent = '⛓ 解除关联，放回主流'; }
+      }, 3000);
+      return;
+    }
+    clearTimeout(this._unlinkTimer);
+    const oldParent = item.parentId;   // 先留原值，写库失败要能还原成"还挂在原父级下"
+    item.parentId = null;          // 只清这一个字段：记录、图片、标签、时间全部保留
+    item.updatedAt = Date.now();   // 关键：LWW 靠它把"已剥离"同步到其他设备
+    try{
+      await db.updateItem(item);
+    }catch(err){
+      console.error(err);
+      item.parentId = oldParent;
+      toast('解除失败，请查看控制台');
+      return;
+    }
+    this.cancelEdit();
+    if(state.drawerPath.length > 1) this.drawerBack();  // 退回父素材，其「包含素材」数量同步减少
+    else this.closeDrawer();                            // 兜底：栈只有一层时直接关抽屉
+    this.cards();                                       // 这块素材回到主流瀑布流
+    cloudSync.schedule();
+    backup.run(false);
+    toast('已放回主流，素材仍完整保留');
   },
 
   /* ---------- V2.0 第一步：关联 + 隐藏 ---------- */
@@ -2235,6 +2296,7 @@ function bindEvents(){
   // V2.0：抽屉内「+ 关联素材」与「包含素材」条目都由抽屉体委托（每次渲染都是新节点）
   $('#drawerBody').addEventListener('click', (e)=>{
     if(e.target.closest('#drawerLinkBtn')){ render.startLink(); return; }
+    if(e.target.closest('#drawerUnlinkBtn')){ render.unlink(); return; }   // V2.0 第三步：剥离
     const kid = e.target.closest('.link-kid');   // V2.0 第二步：点条目推入子素材详情
     if(kid) render.pushChild(Number(kid.dataset.kidId));
   });

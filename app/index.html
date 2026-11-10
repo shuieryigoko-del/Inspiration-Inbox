@@ -33,6 +33,18 @@
     --seg-active:#FFFFFF;
     --r-card:12px;
     --seg-shadow:0 3px 8px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.04);
+    /* V2.8.0 换肤：这三项原先写死在 body / .card-content 里，
+       而"换肤"换的不只是颜色——古籍要宋体和大行距，废土要等宽和紧凑。
+       抽成变量后，皮肤只覆盖变量，渲染逻辑一行不用动。 */
+    --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",
+      "HarmonyOS Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    --lh-body:1.52;          /* 卡片正文 */
+    --lh-doc:1.78;           /* 内核文档视图，比卡片更舒展 */
+    --tag-glow:none;         /* 标签的荧光，只有赛博废土用 */
+    /* 时间戳、标签、域名这类"数据"用的字体。默认 inherit 表示跟随正文字体，
+       只有赛博废土把它换成等宽——等宽做正文会让中文混排变宽，
+       手机上一整行工具条都装不下（「封存碎片」被挤到第二行）。 */
+    --font-data:inherit;
   }
   /* ---------- 主题变量：夜间（系统深色） ---------- */
   [data-theme="dark"]{
@@ -55,6 +67,127 @@
     --seg-shadow:0 3px 8px rgba(0,0,0,.5);
   }
 
+  /* ============================================================
+     三态换肤：skīn 决定"用哪套语言"，theme 决定"开灯还是关灯"
+     皮肤与明暗正交，六个组合各写全一套变量。
+     每套都必须覆盖全部变量，不能让上一个皮肤的残留漏过来——
+     否则会出现"宣纸底配荧光青字"这种互不相识的组合。
+     极简流线不写规则：它就是上面 :root / [data-theme=dark]，一个字节都没改。
+     选择器顺序有讲究：[data-skin="x"] 与 [data-theme="dark"] 特异性相同，
+     靠后者胜出，所以皮肤规则必须写在日夜规则之后；
+     而"某皮肤的夜间版"要用两个属性（特异性更高）才能盖回自己。
+     ============================================================ */
+
+  /* ---------- 古籍线装 · 日：宣纸、墨、印泥朱 ---------- */
+  html[data-skin="classic"]{
+    --bg:#F4F1EA;
+    --card:#FAF7EF;
+    --text:#2B2620;
+    --text-2:#8B8069;
+    --accent:#9C3B2E;
+    --accent-soft:rgba(156,59,46,.10);
+    --border:rgba(43,38,32,.13);
+    --sep:rgba(43,38,32,.18);
+    --shadow:none;
+    --shadow-hover:none;
+    --glass:rgba(244,241,234,.90);
+    --scrim:rgba(43,38,32,.20);
+    --danger:#A33A2B;
+    --fill:rgba(43,38,32,.06);
+    --card-hover:#F5F1E6;
+    --seg-active:#FAF7EF;
+    --r-card:0px;                 /* 线装书没有圆角 */
+    --seg-shadow:none;
+    --font-ui:"Songti SC","Noto Serif CJK SC","Source Han Serif SC",STSong,SimSun,serif;
+    --lh-body:1.9;
+    --lh-doc:2.05;
+    --tag-glow:none;
+  }
+  /* ---------- 古籍线装 · 夜：灯下读旧书 ---------- */
+  html[data-skin="classic"][data-theme="dark"]{
+    --bg:#17130E;
+    --card:#201A13;
+    --text:#DFD3BC;
+    --text-2:#8E7F66;
+    --accent:#C9805C;
+    --accent-soft:rgba(201,128,92,.14);
+    --border:rgba(223,211,188,.13);
+    --sep:rgba(223,211,188,.17);
+    --shadow:none;
+    --shadow-hover:none;
+    --glass:rgba(23,19,14,.90);
+    --scrim:rgba(0,0,0,.55);
+    --danger:#D9564A;
+    --fill:rgba(223,211,188,.07);
+    --card-hover:#271F17;
+    --seg-active:#33291E;
+    --r-card:0px;
+    --seg-shadow:none;
+    --font-ui:"Songti SC","Noto Serif CJK SC","Source Han Serif SC",STSong,SimSun,serif;
+    --lh-body:1.9;
+    --lh-doc:2.05;
+    --tag-glow:none;
+  }
+
+  /* ---------- 赛博废土 · 夜：极深黑灰、荧光青 ---------- */
+  html[data-skin="wasteland"]{
+    --bg:#08090B;
+    --card:#0F1216;
+    --text:#C6D5D8;
+    --text-2:#5E7378;
+    --accent:#3DF0C8;
+    --accent-soft:rgba(61,240,200,.13);
+    --border:rgba(61,240,200,.15);
+    --sep:rgba(61,240,200,.20);
+    --shadow:none;
+    --shadow-hover:none;
+    --glass:rgba(8,9,11,.90);
+    --scrim:rgba(0,0,0,.62);
+    --danger:#FF4D6D;
+    --fill:rgba(61,240,200,.07);
+    --card-hover:#141A20;
+    --seg-active:#1A222A;
+    --r-card:2px;                 /* 硬边，但不做直角——直角看着像没画完 */
+    --seg-shadow:none;
+    --font-ui:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC",
+      "Microsoft YaHei",system-ui,sans-serif;
+    --font-data:ui-monospace,"SF Mono",Menlo,Consolas,"Cascadia Mono",monospace;
+    --lh-body:1.66;
+    --lh-doc:1.85;
+    --tag-glow:0 0 7px rgba(61,240,200,.50);
+  }
+  /* ---------- 赛博废土 · 日：褪色终端 ---------- */
+  html[data-skin="wasteland"][data-theme="light"]{
+    --bg:#DDE1E3;
+    --card:#E9EDEE;
+    --text:#16333A;
+    --text-2:#5B7A80;
+    --accent:#0A7A66;
+    --accent-soft:rgba(10,122,102,.12);
+    --border:rgba(10,122,102,.20);
+    --sep:rgba(10,122,102,.26);
+    --shadow:none;
+    --shadow-hover:none;
+    --glass:rgba(221,225,227,.90);
+    --scrim:rgba(22,51,58,.22);
+    --danger:#B02A3C;
+    --fill:rgba(10,122,102,.08);
+    --card-hover:#E2E7E8;
+    --seg-active:#F2F5F5;
+    --r-card:2px;
+    --seg-shadow:none;
+    --font-ui:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC",
+      "Microsoft YaHei",system-ui,sans-serif;
+    --font-data:ui-monospace,"SF Mono",Menlo,Consolas,"Cascadia Mono",monospace;
+    --lh-body:1.66;
+    --lh-doc:1.85;
+    --tag-glow:0 0 6px rgba(10,122,102,.32);
+  }
+
+  /* 抽屉正文的行高没有跟着 --lh-body 走：它原本是 1.6，直接换成变量会让
+     极简流线下从 1.6 变成 1.52，等于顺手改坏了现有观感。所以只给古籍加一条。 */
+  html[data-skin="classic"] .drawer-content{line-height:1.85;}
+
   *{box-sizing:border-box;margin:0;padding:0;}
   /* [hidden] 的隐藏来自浏览器默认样式表，任何一条作者写的 display 都能压过它。
      本文件里 .player / .music-open / .toast-action 都带 display:flex，
@@ -65,8 +198,7 @@
     /* 系统字体栈：不引入自定义字体，Windows 落到微软雅黑、鸿蒙落到 HarmonyOS Sans。
        V2.5 去掉了原来的 letter-spacing:.5px —— 中文加字距会显得松散，
        系统界面的紧凑感来自字号与行高，不来自字距。 */
-    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",
-      "HarmonyOS Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    font-family:var(--font-ui);
     background:var(--bg);
     color:var(--text);
     line-height:1.5;
@@ -127,6 +259,51 @@
     transition:background-color .15s ease;
   }
   .icon-btn:hover{background:var(--fill);}
+
+  /* ---------- V2.8.0 外观面板 ----------
+     规划里写的是"三态循环"按钮，这里改成一个面板。理由：
+     循环点按要连点两次才知道第三种长什么样，而且"极简流线"和"古籍线装"
+     在两台机器上看起来都是浅色，用户点完记不住自己在哪一态。
+     面板一次把三种摊开，顺带把日夜也放进来——它本来就该和皮肤在一起。 */
+  .appearance-wrap{position:relative;display:flex;align-items:center;}
+  .appearance-panel{
+    position:absolute;top:calc(100% + 10px);right:0;z-index:60;
+    width:238px;padding:12px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    box-shadow:0 14px 36px rgba(0,0,0,.18),0 2px 6px rgba(0,0,0,.08);
+  }
+  .appearance-panel[hidden]{display:none;}
+  /* 三种皮肤各配一种"这面板该长什么样"的影子：古籍是纸片压在桌上（近乎无影），
+     废土是一块发着冷光的屏幕边框 */
+  html[data-skin="classic"] .appearance-panel{border-radius:2px;box-shadow:0 10px 26px rgba(43,38,32,.16);}
+  html[data-skin="classic"][data-theme="dark"] .appearance-panel{box-shadow:0 10px 26px rgba(0,0,0,.5);}
+  html[data-skin="wasteland"] .appearance-panel,
+  html[data-skin="wasteland"][data-theme="dark"] .appearance-panel{
+    border-radius:3px;box-shadow:0 0 0 1px var(--border),0 14px 34px rgba(0,0,0,.55);
+  }
+  .ap-title{
+    font-size:11px;font-weight:600;letter-spacing:.06em;
+    color:var(--text-2);margin:2px 0 7px;
+  }
+  .ap-title:not(:first-child){margin-top:13px;}
+  .ap-seg{display:flex;gap:2px;background:var(--fill);border-radius:9px;padding:3px;}
+  html[data-skin="classic"] .ap-seg{border-radius:0;}
+  html[data-skin="wasteland"] .ap-seg,html[data-skin="wasteland"][data-theme="dark"] .ap-seg{border-radius:2px;}
+  .ap-seg button{
+    flex:1 1 0;min-width:0;padding:7px 2px;
+    border:none;background:none;color:var(--text);
+    font-family:inherit;font-size:12px;line-height:1.3;
+    border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    transition:background-color .14s ease,color .14s ease;
+  }
+  html[data-skin="classic"] .ap-seg button{border-radius:0;}
+  .ap-seg button:hover{color:var(--accent);}
+  .ap-seg button[aria-pressed="true"]{
+    background:var(--seg-active);color:var(--accent);font-weight:600;
+    box-shadow:var(--seg-shadow);
+  }
   .text-btn{
     padding:7px 10px;border-radius:8px;font-size:13px;
     background:transparent;border:none;
@@ -291,15 +468,16 @@
   .card img.card-img{width:100%;display:block;}
   .card img.card-img.cover{height:100%;object-fit:cover;}
   .card-body{padding:14px 16px 15px;}
-  .card-content{font-size:17px;line-height:1.52;white-space:pre-wrap;word-break:break-word;}
+  .card-content{font-size:17px;line-height:var(--lh-body);white-space:pre-wrap;word-break:break-word;}
   /* 正文内自动识别的链接（V1.4）：系统蓝，不加下划线 —— 蓝色本身已足够表意 */
   .frag-link{color:var(--accent);text-decoration:none;
-    overflow-wrap:anywhere;cursor:pointer;}
+    overflow-wrap:anywhere;cursor:pointer;font-family:var(--font-data);}
   .frag-link:active{opacity:.55;}
   .card-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;}
   /* 标签现在可点：点一下按这个标签筛选。外观不变，只在悬停/按下时变蓝，
      否则一排小字全都挂上下划线和手形，一行卡片里会有五六个"可点"的东西在喊。 */
-  .card-tag{font-size:13px;color:var(--text-2);background:none;padding:0;cursor:pointer;}
+  .card-tag{font-size:13px;color:var(--text-2);background:none;padding:0;cursor:pointer;
+    text-shadow:var(--tag-glow);font-family:var(--font-data);}
   .card-tag:hover{color:var(--accent);}
   .card-tag:active{color:var(--accent);opacity:.6;}
   /* V2.0 第四步：搜索穿透命中的子素材，卡头标注它属于谁——
@@ -311,6 +489,7 @@
     font-size:13px;line-height:1.4;
   }
   .card-via-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .card-time{font-family:var(--font-data);}
   .card-meta{display:flex;justify-content:space-between;align-items:center;
     margin-top:6px;font-size:13px;color:var(--text-2);}
   /* V2.5.7：收纳计数。用 --text-2 而不是主色：它是个状态标记，不是操作按钮，
@@ -349,7 +528,7 @@
   .masonry.doc .card::after{display:none;}           /* 不是卡片，也就不该有行分隔线 */
   .masonry.doc .card-body{padding:0 var(--doc-pad) 22px;}
   .masonry.doc .card-img-wrap{margin:0 var(--doc-pad) 16px;}
-  .masonry.doc .card-content{font-size:17.5px;line-height:1.78;}
+  .masonry.doc .card-content{font-size:17.5px;line-height:var(--lh-doc);}
   .masonry.doc .card-meta{margin-top:10px;}
   /* 文档里第一条碎片上方不需要留白：它是紧跟日期行的第一段 */
   .masonry.doc .doc-day + .swipe .card{padding-top:4px;}
@@ -816,7 +995,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.7.1</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.8.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -829,7 +1008,23 @@
     <button id="backupDirBtn" class="text-btn" style="display:none" title="授权后自动备份将静默覆盖写入该文件夹">授权备份文件夹</button>
     <button id="exportBtn" class="text-btn">导出备份</button>
     <button id="importBtn" class="text-btn">导入</button>
-    <button id="themeBtn" class="icon-btn" title="日/夜模式">🌙</button>
+    <div class="appearance-wrap">
+      <button id="appearanceBtn" class="icon-btn" title="外观：皮肤与明暗"
+              aria-haspopup="true" aria-expanded="false" aria-controls="appearancePanel">🎨</button>
+      <div id="appearancePanel" class="appearance-panel" hidden>
+        <div class="ap-title">皮肤</div>
+        <div class="ap-seg" id="apSkin">
+          <button type="button" data-pick="stream">极简流线</button>
+          <button type="button" data-pick="classic">古籍线装</button>
+          <button type="button" data-pick="wasteland">赛博废土</button>
+        </div>
+        <div class="ap-title">明暗</div>
+        <div class="ap-seg" id="apTheme">
+          <button type="button" data-theme-pick="light">☀️ 亮</button>
+          <button type="button" data-theme-pick="dark">🌙 暗</button>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -1036,7 +1231,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.7.1';
+const APP_VERSION = '2.8.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1296,6 +1491,7 @@ const state = {
   currentSpace: 'workspace',
   search: '',
   theme: 'light',
+  skin: 'stream',          // V2.8.0：stream 极简流线 / classic 古籍线装 / wasteland 赛博废土
   pendingImage: null,      // 录入区待封存的图片 Base64
   pendingMusic: null,      // V2.6.0：录入区待封存的音乐卡 {audioUrl, coverImg, note}
   pendingTags: [],        // 录入区已添加的标签
@@ -2451,8 +2647,27 @@ const render = {
   },
 
   theme(){
+    // 两个属性分工：data-skin 决定用哪套语言，data-theme 决定开灯关灯。
+    // 皮肤规则写在 [data-theme="dark"] 之后，靠源码顺序胜出；
+    // 某皮肤的夜间版再用双属性盖回来（见样式层注释）。
     document.documentElement.dataset.theme = state.theme;
-    $('#themeBtn').textContent = state.theme==='dark' ? '☀️' : '🌙';
+    document.documentElement.dataset.skin = state.skin;
+
+    // 面板里的选中态。按钮文字保持不变，只标 aria-pressed——
+    // 换皮肤时文字跟着变会让人以为选项只剩一个。
+    document.querySelectorAll('#apSkin [data-pick]').forEach(b=>{
+      b.setAttribute('aria-pressed', b.dataset.pick === state.skin ? 'true' : 'false');
+    });
+    document.querySelectorAll('#apTheme [data-theme-pick]').forEach(b=>{
+      b.setAttribute('aria-pressed', b.dataset.themePick === state.theme ? 'true' : 'false');
+    });
+
+    // 手机上地址栏颜色跟着底色走，否则宣纸页顶着一根黑色条
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if(meta){
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+      if(bg) meta.content = bg;
+    }
   },
 
   tabs(){
@@ -4039,6 +4254,8 @@ function bindEvents(){
   $('#linkCancelBtn').addEventListener('click', ()=>render.exitLink());
   document.addEventListener('keydown', (e)=>{
     if(e.key !== 'Escape') return;
+    // V2.8.0：外观面板是最轻的一层浮层，先关它
+    if(!$('#appearancePanel').hidden){ setAppearancePanel(false); return; }
     // V2.6.0：弹窗开着时 Esc 先关弹窗，别一按把背后的抽屉也带走了
     if($('#musicModal').classList.contains('open')){ cancelMusicModal(); return; }
     if(state.linkingParentId){ render.exitLink(); return; }  // 先退关联模式，再关抽屉
@@ -4046,11 +4263,35 @@ function bindEvents(){
     render.closeDrawer();
   });
 
-  // —— 日/夜模式 ——
-  $('#themeBtn').addEventListener('click', async ()=>{
-    state.theme = state.theme==='dark' ? 'light' : 'dark';
+  // —— 外观面板：皮肤 + 明暗 ——
+  const apPanel = $('#appearancePanel'), apBtn = $('#appearanceBtn');
+  function setAppearancePanel(open){
+    apPanel.hidden = !open;
+    apBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  apBtn.addEventListener('click', e=>{
+    e.stopPropagation();          // 否则冒泡到下面的"点外面关闭"，刚开就关
+    setAppearancePanel(apPanel.hidden);
+  });
+  $('#apSkin').addEventListener('click', async e=>{
+    const b = e.target.closest('[data-pick]');
+    if(!b || b.dataset.pick === state.skin) return;
+    state.skin = b.dataset.pick;
+    render.theme();
+    await db.setSetting('skin', state.skin);
+  });
+  $('#apTheme').addEventListener('click', async e=>{
+    const b = e.target.closest('[data-theme-pick]');
+    if(!b || b.dataset.themePick === state.theme) return;
+    state.theme = b.dataset.themePick;
     render.theme();
     await db.setSetting('theme', state.theme);
+  });
+  // 点面板之外的地方就收起来。面板本身不拦冒泡，所以选完一个还能接着选另一个。
+  document.addEventListener('click', e=>{
+    if(apPanel.hidden) return;
+    if(apPanel.contains(e.target) || apBtn.contains(e.target)) return;
+    setAppearancePanel(false);
   });
 
   // —— 手动导出 / 导入 / 授权备份文件夹 ——
@@ -4326,6 +4567,8 @@ async function init(){
     await db.open();
     state.items = await db.getAll();
     state.theme = await db.getSetting('theme') || 'light';
+    // 老用户没有 skin 这条设置，读到 null 就落回极简流线——所见与升级前一致
+    state.skin = await db.getSetting('skin') || 'stream';
 
     render.theme();
     render.tabs();

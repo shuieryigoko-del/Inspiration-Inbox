@@ -30,6 +30,7 @@ app/_preview.html
 app/_shot.html
 app/_swipetest.html
 app/_regress.html
+app/_measure.html
 # 外部参考资料与设计探索稿
 .tmp_refs/
 .tmp_frames/

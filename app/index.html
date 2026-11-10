@@ -614,6 +614,7 @@
     border-radius:12px;display:block;background:var(--fill);
   }
   .drawer-player{margin-bottom:16px;}
+  .drawer-audio-name{margin-top:-9px;margin-bottom:16px;font-size:12px;color:var(--text-3);overflow-wrap:anywhere;}
   .drawer-body .music-quote{margin-bottom:16px;}
 
   /* 录入区的音乐卡缩略（跟图片预览同一套位置感） */
@@ -630,14 +631,28 @@
   .music-chip button:hover{color:var(--danger);}
 
   /* 音乐卡弹窗：字段右侧的「粘贴」贴在输入框里，省一个按钮位 */
-  .music-field{position:relative;}
-  .music-field input{padding-right:56px;}
+  /* V2.6.3：这一行里要放「粘贴」「文件」两个按钮，原来那套绝对定位算不出余量了，
+     改成 flex。input 必须 min-width:0，否则它会按默认 20 字符宽撑开，把按钮挤出去。 */
+  .music-field{display:flex;align-items:center;gap:4px;}
+  .music-field input{flex:1 1 auto;min-width:0;padding-right:10px;}
+  .music-field input:disabled{color:var(--text-2);background:var(--fill);}
   .music-paste{
-    position:absolute;right:5px;top:50%;transform:translateY(-50%);
-    padding:5px 8px;border-radius:6px;font-size:12px;color:var(--accent);
+    flex:0 0 auto;padding:6px 7px;border-radius:6px;font-size:12px;color:var(--accent);
     background:var(--card);line-height:1.2;
   }
   .music-paste:active{opacity:.5;}
+
+  /* V2.6.3：选进来的本地音频。它的 audioUrl 是一长串 Base64，塞不进输入框，
+     所以单独用一条行来表示"现在挂着哪个文件、多大"。 */
+  .music-file-row{
+    display:flex;align-items:center;gap:8px;margin-top:8px;
+    padding:8px 10px;border-radius:8px;background:var(--fill);
+    font-size:13px;color:var(--text);
+  }
+  .music-file-icon{flex:0 0 auto;color:var(--accent);}
+  .music-file-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .music-file-size{flex:0 0 auto;font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums;}
+  .music-file-x{flex:0 0 auto;padding:0 2px;font-size:17px;line-height:1;color:var(--text-3);}
   .music-status{font-size:12px;color:var(--text-2);margin-top:10px;min-height:16px;line-height:1.5;}
   .music-status.err{color:var(--danger);}
 
@@ -733,7 +748,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.6.2</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.6.3</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -849,7 +864,7 @@
 <div id="musicModal" class="modal-mask">
   <div class="sync-card music-card">
     <h3>♫ 一首歌</h3>
-    <p class="hint">封面从相册选（听歌界面的截图就好）。链接那一栏可以直接粘 App 里的「复制链接」——整段分享文案也行，我会把网址挑出来。分享链接只在卡片上留一个「去听」入口，<b>.mp3</b> 直链才能在本页里播。</p>
+    <p class="hint">已经下好的歌，点「文件」直接选，卡片上就能播。也可以粘 App 的「复制链接」，那种只留一个「去听」入口。封面从相册选，听歌界面的截图就好。</p>
 
     <label>封面（可留空）</label>
     <div class="music-cover-row">
@@ -862,11 +877,19 @@
       <input id="musicCoverFile" type="file" accept="image/*" hidden>
     </div>
 
-    <label>链接（可留空）</label>
+    <label>声音（可留空）</label>
     <div class="music-field">
-      <input id="musicLinkInput" type="text" inputmode="url" autocomplete="off" placeholder="粘贴分享文案、分享链接或 .mp3 直链">
+      <input id="musicLinkInput" type="text" inputmode="url" autocomplete="off" placeholder="粘贴分享链接">
       <button class="music-paste" type="button" data-paste="musicLinkInput">粘贴</button>
+      <button id="musicFileBtn" class="music-paste" type="button">文件</button>
     </div>
+    <div id="musicFileRow" class="music-file-row" hidden>
+      <span class="music-file-icon">♫</span>
+      <span id="musicFileName" class="music-file-name"></span>
+      <span id="musicFileSize" class="music-file-size"></span>
+      <button id="musicFileClear" class="music-file-x" type="button" title="移除这个文件">×</button>
+    </div>
+    <input id="musicLocalFile" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus" hidden>
 
     <label>当时感受（听歌通感）</label>
     <input id="musicNoteInput" type="text" autocomplete="off" placeholder="像极地干冰的摩擦声">
@@ -945,7 +968,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.6.2';
+const APP_VERSION = '2.6.3';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -965,12 +988,31 @@ const utils = {
 
   // 数据指纹：按 id 排序后序列化，保证顺序不影响比对结果
   fingerprint(items){
+    // V2.6.3：Base64 字段（图片、封面、本地音频）动辄几 MB，每封存一条都
+    // 全量 stringify 再逐字符 hash 一遍太浪费。长字符串只取「长度 + 尾部 48 字」：
+    // 换一首歌必然变，同一首歌两次必然一样。短字段照旧整串参与。
+    const light = v => (typeof v === 'string' && v.length > 512)
+      ? '#' + v.length + ':' + v.slice(-48)
+      : v;
     const sorted = [...items].sort((a,b)=>a.id-b.id);
     return utils.hash(JSON.stringify(sorted.map(x=>({
       id:x.id, space:x.space, type:x.type, content:x.content,
-      tags:x.tags, image:x.image, parentId:x.parentId,
-      audioUrl:x.audioUrl, linkUrl:x.linkUrl, coverImg:x.coverImg, comments:x.comments
+      tags:x.tags, image:light(x.image), parentId:x.parentId,
+      audioUrl:light(x.audioUrl), linkUrl:x.linkUrl,
+      coverImg:light(x.coverImg), comments:x.comments,
+      audioName:x.audioName, audioSize:x.audioSize
     }))));
+  },
+
+  // 把文件原样读成 Base64。图片走 compressImage（能压二十倍），音频压不了，
+  // 只能整个读进来——浏览器能解码但没有重编码的路，除非往里塞一个 wasm 编码器。
+  readAsDataURL(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>resolve(reader.result);
+      reader.onerror = ()=>reject(new Error('read-failed'));
+      reader.readAsDataURL(file);
+    });
   },
 
   // Canvas 压缩图片为 Base64（最长边 1280，JPEG 0.82），防止 IndexedDB 被大图撑爆
@@ -1748,6 +1790,13 @@ const render = {
       const shell = audio.build(item, true);
       shell.classList.add('drawer-player');
       body.appendChild(shell);
+      // 本地文件才有名字。让人一眼确认"挂的是这一首"，不用靠封面猜。
+      if(item.audioName){
+        const nm = document.createElement('div');
+        nm.className = 'drawer-audio-name';
+        nm.textContent = item.audioName;
+        body.appendChild(nm);
+      }
     }else if(item.linkUrl){
       body.appendChild(musicLinkEl(item));
     }
@@ -1955,6 +2004,7 @@ const render = {
     // V2.6.1：判据从"有音频直链"放宽成"有链接或封面"，纯封面卡也要能编辑。
     state.pendingMusic = (item.audioUrl || item.linkUrl || item.coverImg)
       ? { audioUrl:item.audioUrl||null, linkUrl:item.linkUrl||null,
+          audioName:item.audioName||null, audioSize:item.audioSize||null,
           coverImg:item.coverImg||null, note:item.comments||'' }
       : null;
     this.tagChips(); this.imagePreview(); this.musicPreview(); this.saveButton();
@@ -2268,7 +2318,7 @@ const render = {
     }else{
       img.style.display = 'none';
     }
-    chip.querySelector('.music-chip-txt').textContent = (pm.note||'').trim() || '音乐卡';
+    chip.querySelector('.music-chip-txt').textContent = (pm.note||'').trim() || pm.audioName || '音乐卡';
   },
 
   saveButton(){
@@ -2495,6 +2545,10 @@ const cloudSync = {
   _strip(frag){
     const c = Object.assign({}, frag);
     delete c.image;
+    // V2.6.3：本地音频（data:audio/…）不进同步。一条几 MB 的 Base64 塞进 Gist
+    // 必然超时，而它在另一台设备上也没有意义——文件本来就在这台手机里。
+    // 分享链接和直链是 http 开头，只有几十字节，照传。
+    if(/^data:audio\//i.test(c.audioUrl || '')) delete c.audioUrl;
     return c;
   },
 
@@ -3035,23 +3089,68 @@ function paintMusicCover(){
     clear.hidden = true;
   }
 }
+function fmtBytes(n){
+  if(!n) return '';
+  if(n < 1024) return n + ' B';
+  if(n < 1024*1024) return (n/1024).toFixed(0) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+
+// V2.6.3：本地音频。它和"链接"是互斥的两条路——一个存的是文件本身（data:），
+// 一个存的是一个网址。选完文件就把输入框禁掉，免得人以为两个都会生效。
+function paintMusicFile(){
+  const pm = state.pendingMusic || {};
+  const isLocal = /^data:audio\//i.test(pm.audioUrl || '');
+  const row = $('#musicFileRow');
+  const input = $('#musicLinkInput');
+  if(!isLocal){
+    row.hidden = true;
+    input.disabled = false;
+    return;
+  }
+  row.hidden = false;
+  $('#musicFileName').textContent = pm.audioName || '本地音频';
+  $('#musicFileSize').textContent = fmtBytes(pm.audioSize);
+  input.value = '';
+  input.disabled = true;
+}
 function openMusicModal(){
   const pm = state.pendingMusic || {};
   // 一条链接回填到同一个输入框：不管是音频直链还是分享链接，
   // 人只记得"我贴过一个链接"，不该逼他回忆当时算成了哪一类。
-  $('#musicLinkInput').value = pm.audioUrl || pm.linkUrl || '';
+  // 本地文件是例外——它存的是几 MB 的 Base64，塞进输入框就是一堵黑墙，
+  // 而且没法编辑。那种情况交给下面的文件行表示。
+  const isLocal = /^data:audio\//i.test(pm.audioUrl || '');
+  musicBackup = state.pendingMusic ? Object.assign({}, state.pendingMusic) : null;
+  $('#musicLinkInput').value = isLocal ? '' : (pm.audioUrl || pm.linkUrl || '');
   $('#musicNoteInput').value  = pm.note || '';
   $('#musicCoverFile').value = '';
+  $('#musicLocalFile').value = '';
   paintMusicCover();
+  paintMusicFile();
   musicModalStatus('');
   $('#musicModal').classList.add('open');
 }
 function closeMusicModal(){ $('#musicModal').classList.remove('open'); }
 
+// V2.6.3：取消要把这次改动整个丢掉。弹窗里的封面和文件是"边选边写进
+// state.pendingMusic"的，不还原的话，选了文件又点取消，接着封存会悄悄
+// 带上一段你根本没确认过的音频——它是几 MB 的 Base64，界面上什么都看不见。
+let musicBackup = null;
+function cancelMusicModal(){
+  state.pendingMusic = musicBackup ? Object.assign({}, musicBackup) : null;
+  closeMusicModal();
+}
+
 // 链接是音频文件还是网页，靠扩展名分流——不让用户选"类型"。
 // 人只知道"我有一首歌的链接"，分不清直链和分享页；判错了也不会坏，
 // 最差是点一下跳出去（浏览器照样能播），只是少了页内那条播放条。
 const AUDIO_EXT = /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|weba)(\?|#|$)/i;
+
+// 本地音频的上限。图片能压到二十分之一，音频一点都压不了，原文件多大就存多大，
+// Base64 还要再涨 33%。10MB 的歌存进去约 13MB，一条就能顶五十张压缩图。
+// 所以上面不是"能存多少存多少"，而是到这儿就得拦——再大手机浏览器会开始回收存储。
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 // V2.6.2：把粘贴进来的东西洗成一个链接。
 // 音乐 App 的「复制链接」给的从来不是纯 URL：网易云是
@@ -3071,26 +3170,32 @@ function normalizeLink(raw){
 }
 
 function saveMusicToComposer(){
-  const link  = normalizeLink($('#musicLinkInput').value);
+  const prev  = state.pendingMusic || {};
+  // 本地文件优先：选了文件，输入框本来就被禁掉了，这里再兜一次
+  const local = /^data:audio\//i.test(prev.audioUrl || '') ? prev : null;
+  const link  = local ? '' : normalizeLink($('#musicLinkInput').value);
   const note  = $('#musicNoteInput').value.trim();
-  const cover = (state.pendingMusic && state.pendingMusic.coverImg) || null;
+  const cover = prev.coverImg || null;
 
   if(link && !/^https?:\/\//i.test(link)){
     musicModalStatus('没认出来这是一条链接，直接贴分享文案或网址都行', true); return;
   }
-  if(!link && !cover && !note){
-    musicModalStatus('至少填一样：封面、链接或感受', true); return;
+  if(!link && !local && !cover && !note){
+    musicModalStatus('至少填一样：封面、文件、链接或感受', true); return;
   }
   const isAudio = !!link && AUDIO_EXT.test(link);
   state.pendingMusic = {
-    audioUrl: isAudio ? link : null,
+    audioUrl: local ? local.audioUrl : (isAudio ? link : null),
+    audioName: local ? (local.audioName || null) : null,
+    audioSize: local ? (local.audioSize || null) : null,
     linkUrl:  (link && !isAudio) ? link : null,
     coverImg: cover,
     note
   };
   render.musicPreview(); render.saveButton();
   closeMusicModal();
-  toast(isAudio ? '音乐卡已就绪，点封存碎片'
+  toast(local ? '这首歌已存进本机，点封存碎片'
+    : isAudio ? '音乐卡已就绪，点封存碎片'
     : (link ? '这首歌已就绪，点封存碎片' : '封面卡已就绪，点封存碎片'));
 }
 async function renderSyncUI(){
@@ -3129,6 +3234,8 @@ function bindEvents(){
         imageW: state.pendingImage ? state.pendingImage.w : null,
         imageH: state.pendingImage ? state.pendingImage.h : null,
         audioUrl: pm ? (pm.audioUrl||null) : null,
+        audioName: pm ? (pm.audioName||null) : null,
+        audioSize: pm ? (pm.audioSize||null) : null,
         linkUrl:  pm ? (pm.linkUrl||null)  : null,
         coverImg: pm ? (pm.coverImg||null) : null,
         comments: pm ? pm.note : '',
@@ -3161,7 +3268,9 @@ function bindEvents(){
       imageW: state.pendingImage ? state.pendingImage.w : null,  // 图片原始尺寸（瀑布流占位用）
       imageH: state.pendingImage ? state.pendingImage.h : null,
       parentId: null,          // V2.0 关联功能预留
-      audioUrl: pm ? (pm.audioUrl||null) : null,   // V2.6.0 音乐卡（能内播的直链）
+      audioUrl: pm ? (pm.audioUrl||null) : null,   // V2.6.0 音乐卡：直链，或 V2.6.3 本地文件的 Base64
+      audioName: pm ? (pm.audioName||null) : null, // V2.6.3 本地文件名，只用于弹窗回显
+      audioSize: pm ? (pm.audioSize||null) : null, // V2.6.3 原始字节数
       linkUrl:  pm ? (pm.linkUrl||null)  : null,   // V2.6.1 分享链接，只做跳转
       coverImg: pm ? (pm.coverImg||null) : null,
       comments: pm ? pm.note : '',
@@ -3230,8 +3339,8 @@ function bindEvents(){
   /* ---------- V2.6.0：音乐卡 ---------- */
   $('#musicBtn').addEventListener('click', ()=>openMusicModal());
   $('#musicSaveBtn').addEventListener('click', ()=>saveMusicToComposer());
-  $('#musicCancelBtn').addEventListener('click', ()=>closeMusicModal());
-  $('#musicModal').addEventListener('click', e=>{ if(e.target.id==='musicModal') closeMusicModal(); });
+  $('#musicCancelBtn').addEventListener('click', ()=>cancelMusicModal());
+  $('#musicModal').addEventListener('click', e=>{ if(e.target.id==='musicModal') cancelMusicModal(); });
   $('#musicRemoveBtn').addEventListener('click', ()=>{
     state.pendingMusic = null; render.musicPreview(); render.saveButton();
   });
@@ -3258,6 +3367,37 @@ function bindEvents(){
       state.pendingMusic, { coverImg: null });
     $('#musicCoverFile').value = '';
     paintMusicCover();
+  });
+
+  // V2.6.3：选本机的歌。之前只认链接，等于要求人先把手机里的 mp3 传到某个
+  // 服务器上换一个网址回来——手机上根本走不通。文件本来就在手里，直接读它。
+  $('#musicFileBtn').addEventListener('click', ()=>$('#musicLocalFile').click());
+  $('#musicLocalFile').addEventListener('change', async e=>{
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';                 // 清空才能让"同一个文件再选一次"也触发 change
+    if(!file) return;
+    if(file.size > MAX_AUDIO_BYTES){
+      musicModalStatus('这个文件 ' + fmtBytes(file.size) + '，超过 ' + fmtBytes(MAX_AUDIO_BYTES) + ' 了。换小一点的，或者先剪成一小段', true);
+      return;
+    }
+    try{
+      const dataUrl = await utils.readAsDataURL(file);
+      state.pendingMusic = Object.assign({ audioUrl:null, linkUrl:null, note:'', coverImg:null },
+        state.pendingMusic, { audioUrl: dataUrl, audioName: file.name, audioSize: file.size });
+      paintMusicFile();
+      musicModalStatus(file.size > 4*1024*1024
+        ? '这份 ' + fmtBytes(file.size) + ' 原样存在本机。音频压不了，备份文件也会跟着变大'
+        : '已选：' + file.name);
+    }catch(err){
+      musicModalStatus('这个文件读不出来，换一个试试', true);
+    }
+  });
+  $('#musicFileClear').addEventListener('click', ()=>{
+    state.pendingMusic = Object.assign({ audioUrl:null, linkUrl:null, note:'', coverImg:null },
+      state.pendingMusic, { audioUrl:null, audioName:null, audioSize:null });
+    $('#musicLocalFile').value = '';
+    paintMusicFile();
+    musicModalStatus('');
   });
   // 两个字段各有自己的「粘贴」：比猜"你刚才点的是哪个框"可靠
   document.querySelectorAll('.music-paste').forEach(btn=>{
@@ -3527,7 +3667,7 @@ function bindEvents(){
   document.addEventListener('keydown', (e)=>{
     if(e.key !== 'Escape') return;
     // V2.6.0：弹窗开着时 Esc 先关弹窗，别一按把背后的抽屉也带走了
-    if($('#musicModal').classList.contains('open')){ closeMusicModal(); return; }
+    if($('#musicModal').classList.contains('open')){ cancelMusicModal(); return; }
     if(state.linkingParentId){ render.exitLink(); return; }  // 先退关联模式，再关抽屉
     if(state.drawerPath.length > 1){ render.drawerBack(); return; }  // V2.0 第二步：Esc 先逐层返回
     render.closeDrawer();

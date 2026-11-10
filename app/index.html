@@ -309,6 +309,10 @@
   .card-via-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .card-meta{display:flex;justify-content:space-between;align-items:center;
     margin-top:6px;font-size:13px;color:var(--text-2);}
+  /* V2.5.7：收纳计数。用 --text-2 而不是主色：它是个状态标记，不是操作按钮，
+     一排卡片里每张都闪一小块蓝，列表就没有安静的地方了。
+     等宽数字（tabular-nums）是为了 1 和 11 切换时右边缘不跳。 */
+  .card-kids{font-variant-numeric:tabular-nums;white-space:nowrap;}
   .card-del{
     position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;
     background:var(--card-hover);
@@ -606,7 +610,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.6</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.7</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -775,7 +779,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.6';
+const APP_VERSION = '2.5.7';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1082,11 +1086,19 @@ const render = {
     // 因为 .masonry 现在 align-items:stretch（三栏共用一块白面，必须等高），
     // 被拉伸的 flex item 的 scrollHeight 恒等于容器高度，
     // 三栏永远一样高，结果所有卡片都堆进第一栏。
+    // 每条碎片收纳了几块子素材。先算一张表，别在 card() 里逐条 filter——
+    // 那是 O(n²)，几百条碎片时会明显拖慢重绘。
+    const kidCount = new Map();
+    state.items.forEach(x=>{
+      if(x.parentId && byId.has(x.parentId)){
+        kidCount.set(x.parentId, (kidCount.get(x.parentId) || 0) + 1);
+      }
+    });
     const used = new Array(n).fill(0);
     list.forEach(item=>{
       let idx = 0;
       for(let i=1;i<used.length;i++){ if(used[i] < used[idx]) idx = i; }
-      const card = this.wrapSwipe(this.card(item, byId));
+      const card = this.wrapSwipe(this.card(item, byId, kidCount));
       cols[idx].appendChild(card);
       // 刚入 DOM，同步读一次高度即准（图片卡有 aspect-ratio 预留，不会等加载）
       used[idx] += card.offsetHeight || 0;
@@ -1159,7 +1171,7 @@ const render = {
   },
 
   // 单张卡片（全部用 createElement + textContent，杜绝 XSS）
-  card(item, byId){
+  card(item, byId, kidCount){
     const card = document.createElement('article');
     card.className = 'card';
     card.dataset.id = item.id;
@@ -1262,6 +1274,17 @@ const render = {
     const time = document.createElement('span');
     time.textContent = utils.formatTime(item.createdAt);
     meta.appendChild(time);
+    // V2.5.7：这条素材里还收着几块碎片。关联是这套东西的主线功能，但收完回到列表，
+    // 这张卡和普通卡长得一模一样——不点开就永远不知道里面还有东西。
+    // 计数在 cards() 里一次算成表传进来，不在卡片内部 filter。
+    const kidN = kidCount ? (kidCount.get(item.id) || 0) : 0;
+    if(kidN){
+      const badge = document.createElement('span');
+      badge.className = 'card-kids';
+      badge.textContent = '↳ ' + kidN;
+      badge.title = `里面还收着 ${kidN} 块碎片`;
+      meta.appendChild(badge);
+    }
     body.appendChild(meta);
     card.appendChild(body);
 
@@ -1336,6 +1359,11 @@ const render = {
     time.textContent = `封存于 ${utils.formatTime(item.createdAt)}，在${SPACE_NAMES[item.space]}`;
     body.appendChild(time);
 
+    // V2.0：包含素材（第一步只做展示，证明数据完整保留；推入/剥离见后续步骤）
+    const kids = state.items
+      .filter(x=>x.parentId === item.id)
+      .sort((a,b)=>b.createdAt-a.createdAt);
+
     // V2.0：三空间同构——冷库/工作台/内核都能发起关联（父子必在同一空间，渲染层已按 space 隔离）
     // 只在最外层（父素材详情）给入口；推入到子素材后不再加层，避免"素材的素材的素材"
     if(!state.linkingParentId && depth <= 1){
@@ -1344,16 +1372,14 @@ const render = {
       const btn = document.createElement('button');
       btn.id = 'drawerLinkBtn';
       btn.className = 'drawer-link-btn';
-      btn.textContent = '+ 关联素材';
+      // 已有收纳时把数量写在按钮上：否则再点进去看到一片勾选的素材，
+      // 分不清哪些是已经收进来的、哪些是还没收的。
+      btn.textContent = kids.length ? `+ 关联素材（已有 ${kids.length} 块）` : '+ 关联素材';
       btn.title = '把其他碎片归入这一条';
       actions.appendChild(btn);
       body.appendChild(actions);
     }
 
-    // V2.0：包含素材（第一步只做展示，证明数据完整保留；推入/剥离见后续步骤）
-    const kids = state.items
-      .filter(x=>x.parentId === item.id)
-      .sort((a,b)=>b.createdAt-a.createdAt);
     if(kids.length){
       const sec = document.createElement('div');
       sec.className = 'drawer-section';

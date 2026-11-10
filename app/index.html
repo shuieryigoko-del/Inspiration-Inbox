@@ -209,16 +209,24 @@
   .save-btn:hover{opacity:.88;}
   .save-btn:disabled{opacity:.36;cursor:not-allowed;}
 
-  /* ---------- 列表：多栏 ---------- */
-  /* V2.5：单列。V2.5.2 起改回多栏，但不是 V2.4.2 那种"一堆各自悬浮的卡片流"——
-     宽屏下是几栏连续的白色面并排，像一份分栏排版的文档。
-     区别在于：卡片之间仍然只靠 1px 分隔线断开，没有投影、没有圆角缝隙，
-     所以一屏能看见十几条，却不显得碎。 */
+  /* ---------- 列表：分栏 ---------- */
+  /* V2.5：单列。V2.5.2 起改回多栏。
+     V2.5.3：栏与栏之间不再留 20px 缝隙——有缝隙就是三张并排的卡片。
+     现在三栏共用一块白面，中间只隔一条 1px 竖线，读起来是一份分栏排版的文档。
+     图片也不再顶到栏边，而是缩进 16px 带圆角，像贴在纸上，不是贴满整格。 */
   .masonry{
-    max-width:1120px;margin:0 auto;width:100%;padding:0 20px;
-    display:flex;flex-direction:row;align-items:flex-start;gap:20px;
+    max-width:1360px;margin:0 auto;width:100%;padding:0 20px;
+    display:flex;flex-direction:row;align-items:stretch;gap:0;
   }
-  .masonry-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;}
+  .masonry-col{
+    flex:1 1 0;min-width:0;display:flex;flex-direction:column;
+    background:var(--card);overflow:hidden;   /* overflow 必须有，否则卡片白底盖住圆角 */
+  }
+  .masonry-col + .masonry-col{border-left:1px solid var(--border);}
+  /* 圆角只给整块版面的两个外角。每栏各自圆角，就会读成三张卡片 */
+  .masonry-col:first-child{border-radius:var(--r-card) 0 0 0;}
+  .masonry-col:last-child{border-radius:0 var(--r-card) 0 0;}
+  .masonry-col:only-child{border-radius:var(--r-card) var(--r-card) 0 0;}
   /* V2.5.1：每张卡片外面套一层左滑容器。手机上原来靠卡片右上角常驻的 ✕ 删除，
      那是网页的做法；原生列表把操作藏在左滑后面——静止时只有内容，没有控件。
      桌面端仍然保留 hover 才出现的 ✕（见 .card-del）。 */
@@ -226,9 +234,9 @@
     position:relative;overflow:hidden;
     background:var(--danger);
   }
-  .swipe:first-child{border-radius:var(--r-card) var(--r-card) 0 0;}
-  .swipe:last-child{border-radius:0 0 var(--r-card) var(--r-card);}
-  .swipe:only-child{border-radius:var(--r-card);}
+  /* V2.5.3：圆角上移到 .masonry-col（整块版面的外角），单条不再自带圆角。
+     否则每栏的第一条和最后一条各自圆起来，三栏就是三个独立的胶囊。 */
+  .swipe:first-child,.swipe:last-child,.swipe:only-child{border-radius:0;}
   .swipe-actions{
     position:absolute;top:0;right:0;bottom:0;
     display:flex;align-items:stretch;
@@ -253,16 +261,20 @@
     margin-bottom:0;overflow:hidden;
     transition:background-color .14s ease;cursor:pointer;position:relative;
   }
-  /* 分隔线从内容左边缘起，不贯穿整宽 —— iOS 的行分隔就是这个缩进，
-     画满整宽会让人读成表格的行。 */
+  /* 分隔线两端都缩进 16px：栏内已经是一条白面，线画满就变成表格的行 */
   .card::after{
-    content:'';position:absolute;left:16px;right:0;bottom:0;
+    content:'';position:absolute;left:16px;right:16px;bottom:0;
     height:1px;background:var(--border);
   }
-  /* 圆角与末行分隔线都由 .swipe 容器承担（见上方 .swipe 规则） */
+  /* 圆角与末行分隔线由 .masonry-col 承担（见上方规则） */
   .swipe:last-child .card::after{display:none;}
   .card:hover{background:var(--card-hover);}
-  .card-img-wrap{width:100%;overflow:hidden;background:var(--bg);}
+  /* V2.5.3：图片缩进 16px、带 8px 圆角，上下留白 —— 之前撑满整栏，
+     三栏排在一起像图片托管站的相册。留白之后才像"贴在纸上"。 */
+  .card-img-wrap{
+    width:auto;margin:14px 16px 0;border-radius:8px;
+    overflow:hidden;background:var(--bg);
+  }
   .card img.card-img{width:100%;display:block;}
   .card img.card-img.cover{height:100%;object-fit:cover;}
   .card-body{padding:14px 16px 15px;}
@@ -559,7 +571,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.2</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.3</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -724,7 +736,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.2';
+const APP_VERSION = '2.5.3';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -985,9 +997,9 @@ const render = {
     const cs = getComputedStyle(box);
     const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
     const inner = box.clientWidth - pad;
-    if(inner >= 1000) return 3;
-    if(inner >= 620) return 2;
-    return 1;
+    // 每栏不低于 320px：再窄，17px 的字一行只放得下十来个，读起来断气。
+    // 上限 5 栏，再多就碎成缩略图墙，认不出内容。
+    return Math.max(1, Math.min(5, Math.floor(inner / 320)));
   },
 
   cards(){
@@ -1014,14 +1026,18 @@ const render = {
       cols.push(col);
     }
     // 逐张放入"当前最矮的列"，形成瀑布流。
-    // V1.4.1 起：图片卡用 aspect-ratio 预留高度（新数据带尺寸，同步测量即准确），
-    // 卡片一旦放入某列就不再移动——旧版图片加载后跨列重平衡会造成"飞到别处又回来"的闪烁。
+    // V2.5.3：改成自己记账累计高度，不再读 col.scrollHeight。
+    // 因为 .masonry 现在 align-items:stretch（三栏共用一块白面，必须等高），
+    // 被拉伸的 flex item 的 scrollHeight 恒等于容器高度，
+    // 三栏永远一样高，结果所有卡片都堆进第一栏。
+    const used = new Array(n).fill(0);
     list.forEach(item=>{
-      let target = cols[0];
-      for(let i=1;i<cols.length;i++){
-        if(cols[i].scrollHeight < target.scrollHeight) target = cols[i];
-      }
-      target.appendChild(this.wrapSwipe(this.card(item, byId)));
+      let idx = 0;
+      for(let i=1;i<used.length;i++){ if(used[i] < used[idx]) idx = i; }
+      const card = this.wrapSwipe(this.card(item, byId));
+      cols[idx].appendChild(card);
+      // 刚入 DOM，同步读一次高度即准（图片卡有 aspect-ratio 预留，不会等加载）
+      used[idx] += card.offsetHeight || 0;
     });
   },
 
@@ -1039,7 +1055,15 @@ const render = {
     // body 的 padding-right 有 320ms 过渡，过渡中 columnCount() 会连续变化，
     // 但只在"列数跨过断点"时重建，最多各一次。
     const n = this.columnCount();
-    if(n !== state._cols) this.cards();
+    if(n !== state._cols && !this._colRaf){
+      // 重建会改 DOM 高度，直接写在 ResizeObserver 回调里会触发
+      // "ResizeObserver loop completed with undelivered notifications"；
+      // 推到下一帧做，观察器这一轮已经结算完。
+      this._colRaf = requestAnimationFrame(()=>{
+        this._colRaf = null;
+        this.cards();
+      });
+    }
   },
 
   // 把正文中的 http(s) 链接安全地拆成"文本节点 + 可点击 <a>"（V1.4）。

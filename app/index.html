@@ -995,7 +995,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.8.0</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.8.1</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -1034,7 +1034,7 @@
     <button class="tab active" data-space="workspace">工作台</button>
     <button class="tab" data-space="core">内核</button>
   </div>
-  <button id="godViewBtn" class="god-toggle" aria-pressed="false" title="把归入父素材的子碎片也平铺到主流，方便一眼看全">⌗ 上帝视角</button>
+  <button id="godViewBtn" class="god-toggle" aria-pressed="false" title="把归入父素材的子碎片也平铺到主流，方便一眼看全">上帝视角</button>
 </nav>
 
 <section class="composer">
@@ -1231,7 +1231,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.8.1';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -2565,7 +2565,7 @@ const render = {
     if(btn){
       btn.classList.toggle('on', state.godView);
       btn.setAttribute('aria-pressed', state.godView ? 'true' : 'false');
-      btn.textContent = state.godView ? '⌗ 上帝视角 · 开' : '⌗ 上帝视角';
+      btn.textContent = state.godView ? '上帝视角 · 开' : '上帝视角';
     }
     this.cards();
     if(state.godView && state.linkingParentId) toast('关联模式下仍只显示主素材，退出关联后才会平铺');

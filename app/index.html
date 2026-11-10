@@ -733,7 +733,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.6.1</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.6.2</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -849,7 +849,7 @@
 <div id="musicModal" class="modal-mask">
   <div class="sync-card music-card">
     <h3>♫ 一首歌</h3>
-    <p class="hint">封面从相册选（听歌界面的截图就好）。链接贴分享链接或 <b>.mp3</b> 直链：分享链接只在卡片上留一个「去听」入口，直链才能在本页里播。</p>
+    <p class="hint">封面从相册选（听歌界面的截图就好）。链接那一栏可以直接粘 App 里的「复制链接」——整段分享文案也行，我会把网址挑出来。分享链接只在卡片上留一个「去听」入口，<b>.mp3</b> 直链才能在本页里播。</p>
 
     <label>封面（可留空）</label>
     <div class="music-cover-row">
@@ -864,7 +864,7 @@
 
     <label>链接（可留空）</label>
     <div class="music-field">
-      <input id="musicLinkInput" type="url" inputmode="url" autocomplete="off" placeholder="分享链接或 .mp3 直链">
+      <input id="musicLinkInput" type="text" inputmode="url" autocomplete="off" placeholder="粘贴分享文案、分享链接或 .mp3 直链">
       <button class="music-paste" type="button" data-paste="musicLinkInput">粘贴</button>
     </div>
 
@@ -945,7 +945,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.6.1';
+const APP_VERSION = '2.6.2';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -3053,13 +3053,30 @@ function closeMusicModal(){ $('#musicModal').classList.remove('open'); }
 // 最差是点一下跳出去（浏览器照样能播），只是少了页内那条播放条。
 const AUDIO_EXT = /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|weba)(\?|#|$)/i;
 
+// V2.6.2：把粘贴进来的东西洗成一个链接。
+// 音乐 App 的「复制链接」给的从来不是纯 URL：网易云是
+//   "分享单曲《x》 https://music.163.com/song?id=1&userid=2 (@网易云音乐)"
+// QQ音乐、抖音同理，链接前后裹着一段话和括号。直接拿它去过 http(s) 校验
+// 必然失败，于是人就卡在第一步，以为这条路过不去。所以先把 URL 抠出来。
+function normalizeLink(raw){
+  const s = (raw||'').trim();
+  if(!s) return '';
+  // 字符类里必须排掉中文标点：分享文案常写成 "...userid=2，这首"，不排的话
+  // "，这首" 会被当成 URL 的一部分一起存下来，跳过去就是 404。
+  const m = s.match(/https?:\/\/[^\s<>"'()（）【】\[\]，。、；：！？“”‘’《》「」]+/i);
+  if(m) return m[0];
+  // 没写协议的裸域名（music.163.com/song?id=1）补一个，比弹回去让人自己加更省事
+  if(/^[\w-]+(\.[\w-]+)+([\/?#]|$)/.test(s)) return 'https://' + s;
+  return s;
+}
+
 function saveMusicToComposer(){
-  const link  = $('#musicLinkInput').value.trim();
+  const link  = normalizeLink($('#musicLinkInput').value);
   const note  = $('#musicNoteInput').value.trim();
   const cover = (state.pendingMusic && state.pendingMusic.coverImg) || null;
 
   if(link && !/^https?:\/\//i.test(link)){
-    musicModalStatus('链接要以 http(s):// 开头', true); return;
+    musicModalStatus('没认出来这是一条链接，直接贴分享文案或网址都行', true); return;
   }
   if(!link && !cover && !note){
     musicModalStatus('至少填一样：封面、链接或感受', true); return;

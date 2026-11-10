@@ -208,6 +208,31 @@
     display:flex;flex-direction:column;align-items:stretch;gap:0;
   }
   .masonry-col{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  /* V2.5.1：每张卡片外面套一层左滑容器。手机上原来靠卡片右上角常驻的 ✕ 删除，
+     那是网页的做法；原生列表把操作藏在左滑后面——静止时只有内容，没有控件。
+     桌面端仍然保留 hover 才出现的 ✕（见 .card-del）。 */
+  .swipe{
+    position:relative;overflow:hidden;
+    background:var(--danger);
+  }
+  .swipe:first-child{border-radius:var(--r-card) var(--r-card) 0 0;}
+  .swipe:last-child{border-radius:0 0 var(--r-card) var(--r-card);}
+  .swipe:only-child{border-radius:var(--r-card);}
+  .swipe-actions{
+    position:absolute;top:0;right:0;bottom:0;
+    display:flex;align-items:stretch;
+  }
+  .swipe-actions button{
+    width:76px;border:none;background:var(--danger);color:#fff;
+    font-size:15px;padding:0;cursor:pointer;
+  }
+  .swipe-actions button:active{filter:brightness(.88);}
+  .swipe.no-swipe .swipe-actions{display:none;}
+  /* 只有松手后吸附才走过渡；拖动过程中必须跟手，所以 .animate 是临时加的 */
+  .swipe.animate .card{
+    transition:transform .26s cubic-bezier(.25,.9,.3,1), background-color .14s ease;
+  }
+  .swipe.open .card{transform:translateX(-76px);}
   /* V2.5：整列是一个连续白面，行与行之间一条细线，不是一堆各自悬浮的卡片。
      这是"列表"和"卡片流"的分界：卡片流里每条都在抢注意力，
      列表里注意力跟着阅读顺序走 —— 分隔线比间距更安静地完成这件事。 */
@@ -223,10 +248,8 @@
     content:'';position:absolute;left:16px;right:0;bottom:0;
     height:1px;background:var(--border);
   }
-  .card:first-child{border-radius:var(--r-card) var(--r-card) 0 0;}
-  .card:last-child{border-radius:0 0 var(--r-card) var(--r-card);}
-  .card:last-child::after{display:none;}
-  .card:only-child{border-radius:var(--r-card);}
+  /* 圆角与末行分隔线都由 .swipe 容器承担（见上方 .swipe 规则） */
+  .swipe:last-child .card::after{display:none;}
   .card:hover{background:var(--card-hover);}
   .card-img-wrap{width:100%;overflow:hidden;background:var(--bg);}
   .card img.card-img{width:100%;display:block;}
@@ -257,7 +280,8 @@
     opacity:0;transition:opacity .15s,color .15s;
   }
   .card:hover .card-del{opacity:1;}
-  @media (hover:none){.card-del{opacity:.9;}}
+  /* 手机上没有 hover，删除改由左滑触发，不再保留常驻的 ✕ */
+  @media (hover:none){.card-del{display:none;}}
   .card-del:hover{color:var(--danger);}
 
   /* ---------- V2.0 父子关联（第一步：关联 + 隐藏） ---------- */
@@ -531,7 +555,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.0</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.1</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -696,7 +720,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.5.1';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -987,7 +1011,7 @@ const render = {
       for(let i=1;i<cols.length;i++){
         if(cols[i].scrollHeight < target.scrollHeight) target = cols[i];
       }
-      target.appendChild(this.card(item, byId));
+      target.appendChild(this.wrapSwipe(this.card(item, byId)));
     });
   },
 
@@ -1157,6 +1181,27 @@ const render = {
     card.appendChild(del);
 
     return card;
+  },
+
+  // V2.5.1：左滑容器。关联模式下不参与左滑（此时点卡片是勾选，滑开会误触）。
+  wrapSwipe(card){
+    const wrap = document.createElement('div');
+    wrap.className = 'swipe';
+    wrap.dataset.id = card.dataset.id;
+    if(state.linkingParentId){
+      wrap.classList.add('no-swipe');
+    }else{
+      const acts = document.createElement('div');
+      acts.className = 'swipe-actions';
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = '删除';
+      del.dataset.action = 'delete-swipe';
+      acts.appendChild(del);
+      wrap.appendChild(acts);
+    }
+    wrap.appendChild(card);
+    return wrap;
   },
 
   // 抽屉详情
@@ -2419,8 +2464,105 @@ function bindEvents(){
   // —— V2.0 第五步：上帝视角开关（纯视图，不改数据） ——
   $('#godViewBtn').addEventListener('click', ()=>render.toggleGod());
 
-  // —— 瀑布流事件委托：点卡片开抽屉，点 ✕ 删除 ——
-  $('#masonry').addEventListener('click', async (e)=>{
+  // —— 列表事件委托：点卡片开抽屉；桌面点 ✕ 或手机左滑后点「删除」都走同一段逻辑 ——
+  const THRESH = 38;    // 松手位移超过它就吸附为打开
+  const OPEN_W = 76;    // 与 CSS 里 .swipe-actions button 的宽度保持一致
+  const swipe = { wrap:null, x0:0, y0:0, start:0, dx:0, locked:false };
+
+  // 收起所有已滑开的行（except 用于"开新的之前先关旧的"）
+  function closeSwipes(except){
+    document.querySelectorAll('.swipe.open').forEach(s=>{
+      if(s !== except){ s.classList.add('animate'); s.classList.remove('open'); }
+    });
+  }
+
+  // 删除一块碎片。V2.0：删父素材前先把它的子素材放回主流，
+  // 否则子素材会永远看不见（防丢底线）。
+  async function removeFragment(id){
+    const item = state.items.find(x=>x.id===id);
+    if(!item) return;
+    if(!confirm(`确定删除这块碎片吗？\n\n「${(item.content||'（图片碎片）').slice(0,30)}…」\n\n删除后会同步到其他设备。`)) return;
+    const now = Date.now();
+    const kids = state.items.filter(x=>x.parentId===id);
+    for(const k of kids){
+      k.parentId = null;
+      k.updatedAt = now;
+      await db.updateItem(k);
+    }
+    await db.deleteItem(id);
+    await cloudSync.tombstone(id); // 记墓碑并触发云同步（未开启同步时无副作用）
+    state.items = state.items.filter(x=>x.id!==id);
+    render.all();
+    await backup.run(false);
+  }
+
+  const listBox = $('#masonry');
+
+  listBox.addEventListener('touchstart', (e)=>{
+    if(state.linkingParentId || e.touches.length !== 1){ swipe.wrap = null; return; }
+    const w = e.target.closest('.swipe');
+    if(!w || w.classList.contains('no-swipe')){ swipe.wrap = null; return; }
+    const t = e.touches[0];
+    swipe.wrap = w;
+    swipe.x0 = t.clientX;
+    swipe.y0 = t.clientY;
+    swipe.start = w.classList.contains('open') ? -OPEN_W : 0;
+    swipe.dx = swipe.start;
+    swipe.locked = false;
+  }, {passive:true});
+
+  listBox.addEventListener('touchmove', (e)=>{
+    const w = swipe.wrap;
+    if(!w || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipe.x0;
+    const dy = t.clientY - swipe.y0;
+    if(!swipe.locked){
+      if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      // 竖向意图更明显 → 放弃接管，把这次滑动交还给页面滚动
+      if(Math.abs(dy) >= Math.abs(dx)){ swipe.wrap = null; return; }
+      swipe.locked = true;
+      w.classList.remove('animate');
+      closeSwipes(w);
+    }
+    // 只在确认是横向之后才阻止滚动，否则列表就滑不动了
+    if(e.cancelable) e.preventDefault();
+    let next = swipe.start + dx;
+    // 两端留阻尼：滑过头不会硬停，但也不会一路飞出去
+    if(next > 0) next *= 0.25;
+    else if(next < -OPEN_W) next = -OPEN_W + (next + OPEN_W) * 0.25;
+    swipe.dx = next;
+    w.querySelector('.card').style.transform = `translateX(${next}px)`;
+  }, {passive:false});
+
+  function endSwipe(){
+    const w = swipe.wrap;
+    swipe.wrap = null;
+    if(!w || !swipe.locked) return;
+    w.classList.add('animate');
+    w.querySelector('.card').style.transform = '';   // 交回 CSS 控制
+    if(swipe.dx < -THRESH){ closeSwipes(w); w.classList.add('open'); }
+    else { w.classList.remove('open'); }
+  }
+  listBox.addEventListener('touchend', endSwipe);
+  listBox.addEventListener('touchcancel', endSwipe);
+
+  // 一滚就走开，不让某一行一直敞着
+  window.addEventListener('scroll', ()=>{
+    if(swipe.locked) return;
+    if(document.querySelector('.swipe.open')) closeSwipes(null);
+  }, {passive:true});
+
+  listBox.addEventListener('click', async (e)=>{
+    // 左滑露出的「删除」不在卡片内，先单独接住
+    const swipeDel = e.target.closest('[data-action="delete-swipe"]');
+    if(swipeDel){
+      const w = swipeDel.closest('.swipe');
+      closeSwipes(null);
+      await removeFragment(Number(w.dataset.id));
+      return;
+    }
+
     const delBtn = e.target.closest('[data-action="delete"]');
     const cardEl = e.target.closest('.card');
     if(!cardEl) return;
@@ -2433,25 +2575,11 @@ function bindEvents(){
       return;
     }
 
-    if(delBtn){
-      e.stopPropagation();
-      const item = state.items.find(x=>x.id===id);
-      if(!confirm(`确定删除这块碎片吗？\n\n「${(item.content||'（图片碎片）').slice(0,30)}…」\n\n删除后会同步到其他设备。`)) return;
-      // V2.0：删父素材前先把它的子素材放回主流，否则子素材会永远看不见（防丢底线）
-      const now = Date.now();
-      const kids = state.items.filter(x=>x.parentId===id);
-      for(const k of kids){
-        k.parentId = null;
-        k.updatedAt = now;
-        await db.updateItem(k);
-      }
-      await db.deleteItem(id);
-      await cloudSync.tombstone(id); // 记墓碑并触发云同步（未开启同步时无副作用）
-      state.items = state.items.filter(x=>x.id!==id);
-      render.all();
-      await backup.run(false);
-      return;
-    }
+    if(delBtn){ await removeFragment(id); return; }
+
+    // 已经滑开的行，点一下只负责收起——和 iOS 列表一致，不会顺手把详情打开
+    if(cardEl.closest('.swipe.open')){ closeSwipes(null); return; }
+
     render.openDrawer(id);
   });
 

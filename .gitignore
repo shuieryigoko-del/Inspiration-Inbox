@@ -49,3 +49,6 @@ app/_*_probe.html
 .tmp_frames/
 design/
 backups/code/
+app/_doc.html
+app/_docshot.html
+app/_mdcheck.html

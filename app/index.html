@@ -328,6 +328,53 @@
   @media (hover:none){.card-del{display:none;}}
   .card-del:hover{color:var(--danger);}
 
+  /* ---------- V2.7.0 内核：文档视图 ----------
+     冷库和工作台是"收纳"——看的是块，扫一眼就走；
+     内核是"沉淀"——看的是文，得能一路读下去。
+     这里不另写一套渲染：DOM 仍是 .card，点击/删除/左滑/标签筛选全部走既有委托，
+     只把"多栏白面"换成一页居中的竖纸——去掉行分隔线，撑开行距和左右留白。
+     用 max(22px,6%) 而不是固定值：窄屏 360 时 6%=21.6px 刚好贴住 22，
+     宽屏 720 时自动涨到 43px，一栏字的行长稳定在 34 个汉字上下。 */
+  .masonry.doc{
+    --doc-pad:max(22px,6%);
+    display:block;max-width:720px;padding:0 20px;
+  }
+  .masonry.doc .masonry-col{
+    border-radius:var(--r-card);
+    padding:30px 0 10px;
+  }
+  /* 左右边距由 .card-body 和图片各自负责，图片才能和正文严丝合缝地对齐 */
+  .masonry.doc .card{padding-top:14px;background:var(--card);}
+  .masonry.doc .card:hover{background:var(--card);}  /* 读文章时背景不该跟着鼠标变色 */
+  .masonry.doc .card::after{display:none;}           /* 不是卡片，也就不该有行分隔线 */
+  .masonry.doc .card-body{padding:0 var(--doc-pad) 22px;}
+  .masonry.doc .card-img-wrap{margin:0 var(--doc-pad) 16px;}
+  .masonry.doc .card-content{font-size:17.5px;line-height:1.78;}
+  .masonry.doc .card-meta{margin-top:10px;}
+  /* 文档里第一条碎片上方不需要留白：它是紧跟日期行的第一段 */
+  .masonry.doc .doc-day + .swipe .card{padding-top:4px;}
+
+  /* 文档头：标题 + 一句统计 + 导出 */
+  .doc-header{padding:0 var(--doc-pad) 20px;border-bottom:1px solid var(--border);}
+  .doc-title{font-size:25px;font-weight:650;line-height:1.25;}
+  .doc-sub{margin-top:7px;font-size:13px;color:var(--text-2);line-height:1.6;}
+  .doc-actions{margin-top:13px;display:flex;gap:8px;}
+  /* 文字按钮自带 10px 内边距，不拉回来就会比标题右缩一截 */
+  .doc-actions .text-btn{margin-left:-10px;font-size:13.5px;}
+  /* 日期行：左边日期，右边一条细线拉到纸边——像日记的分隔，不像表头 */
+  .doc-day{
+    display:flex;align-items:center;gap:10px;
+    padding:26px var(--doc-pad) 2px;
+    font-size:12px;color:var(--text-2);
+    font-variant-numeric:tabular-nums;
+  }
+  .doc-day::after{content:'';flex:1;height:1px;background:var(--border);}
+
+  /* 录入区跟着文档走：通栏输入框压在一页窄文档上，中间会空出一道断层 */
+  body[data-space="core"] .composer{max-width:720px;}
+  /* 唱片封面在文档里是"配图"，不是广告位：满宽 440 的方块会把正文推到屏幕外 */
+  .masonry.doc .cover-wrap{max-width:240px;margin-left:auto;margin-right:auto;}
+
   /* ---------- V2.0 父子关联（第一步：关联 + 隐藏） ---------- */
   /* 关联模式下：卡片左上角出现勾选框，删除叉隐藏，点卡片=勾选 */
   .card.linking{cursor:pointer;}
@@ -729,6 +776,9 @@
     .tab{flex:1 1 0;padding:7px 2px;font-size:13px;}
     .god-toggle{font-size:12px;padding:7px 8px;flex:0 0 auto;}
     .masonry{padding:0 14px;}
+    /* 文档视图的 20px 比 .masonry 的 14px 更"特"（两个类），不显式覆盖的话
+       纸上会缩进 20、录入区缩进 14，两块的左右边缘差出 12px，一眼就看得出没对齐 */
+    .masonry.doc{padding:0 14px;}
     .composer{width:calc(100% - 28px);padding:12px 16px 10px;}
     .composer textarea{min-height:58px;}
     body{padding-bottom:calc(40px + env(safe-area-inset-bottom));}
@@ -748,7 +798,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.6.3</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.7.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -968,7 +1018,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.6.3';
+const APP_VERSION = '2.7.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1087,6 +1137,13 @@ const utils = {
     const d = new Date(ts);
     const p = n=>String(n).padStart(2,'0');
     return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  },
+
+  // 只要"几点几分"。内核文档页的日期由分组标题统一交代，卡片上再写一遍年月日就是噪音
+  hmStr(ts){
+    const d = new Date(ts);
+    const p = n=>String(n).padStart(2,'0');
+    return `${p(d.getHours())}:${p(d.getMinutes())}`;
   },
 
   // 标签解析：以空格 / 逗号分隔，自动补 #
@@ -1448,10 +1505,18 @@ const render = {
       .sort((a,b)=>b.createdAt-a.createdAt);
   },
 
+  // V2.7.0：内核是唯一用文档排版的空间。它回答的是"我想清楚了什么"，
+  // 不是"我收了多少"——所以这一页不该是一面卡片墙。
+  isDocSpace(){ return state.currentSpace === 'core'; },
+
   // V2.5.2：宽屏多栏。
   // 按"可用内容宽度"决定栏数，不是按窗口宽度——抽屉让位、滚动条都会改变真实可用宽度。
   // 一栏低于 320px 时，17px 的字一行只放得下十来个，读起来会断气，所以 3 栏要求 1000。
   columnCount(){
+    // 文档视图永远单栏。这里必须跟着返回 1：ResizeObserver 是拿这个值
+    // 和上次的 state._cols 比，若它仍按窗口算出 3、实际只建了 1 栏，
+    // 就会以为"列数没对上"而无限重建。
+    if(this.isDocSpace()) return 1;
     const box = $('#masonry');
     if(!box) return 1;
     const cs = getComputedStyle(box);
@@ -1467,6 +1532,8 @@ const render = {
     box.textContent = '';
     audio.resetUIs();   // V2.6.0：旧卡片连同播放条一起没了，登记表必须跟着清
     const list = this.visibleItems();
+    const doc = this.isDocSpace();     // V2.7.0
+    box.classList.toggle('doc', doc);
     const byId = new Map(state.items.map(x=>[x.id,x]));   // V2.0 第四步：查父素材，用于标注来源
     if(!list.length){
       const empty = document.createElement('div');
@@ -1476,10 +1543,23 @@ const render = {
         ? (q.charAt(0) === '#'
             ? `没有带 ${q} 的碎片。搜「${q.slice(1)}」不用加 #。`
             : '没有命中的碎片，换个关键词试试。')
-        : `「${SPACE_NAMES[state.currentSpace]}」还是空的，封存第一块碎片吧。`;
+        : (doc
+            ? '内核还是空的。工作台里想清楚了的那一块，在详情里「换到内核」。'
+            : `「${SPACE_NAMES[state.currentSpace]}」还是空的，封存第一块碎片吧。`);
       box.appendChild(empty);
       return;
     }
+    // 每条碎片收纳了几块子素材。先算一张表，别在 card() 里逐条 filter——
+    // 那是 O(n²)，几百条碎片时会明显拖慢重绘。
+    const kidCount = new Map();
+    state.items.forEach(x=>{
+      if(x.parentId && byId.has(x.parentId)){
+        kidCount.set(x.parentId, (kidCount.get(x.parentId) || 0) + 1);
+      }
+    });
+
+    if(doc){ this.docList(box, list, byId, kidCount); return; }
+
     const n = this.columnCount();
     state._cols = n;
     const cols = [];
@@ -1494,14 +1574,6 @@ const render = {
     // 因为 .masonry 现在 align-items:stretch（三栏共用一块白面，必须等高），
     // 被拉伸的 flex item 的 scrollHeight 恒等于容器高度，
     // 三栏永远一样高，结果所有卡片都堆进第一栏。
-    // 每条碎片收纳了几块子素材。先算一张表，别在 card() 里逐条 filter——
-    // 那是 O(n²)，几百条碎片时会明显拖慢重绘。
-    const kidCount = new Map();
-    state.items.forEach(x=>{
-      if(x.parentId && byId.has(x.parentId)){
-        kidCount.set(x.parentId, (kidCount.get(x.parentId) || 0) + 1);
-      }
-    });
     const used = new Array(n).fill(0);
     list.forEach(item=>{
       let idx = 0;
@@ -1511,6 +1583,79 @@ const render = {
       // 刚入 DOM，同步读一次高度即准（图片卡有 aspect-ratio 预留，不会等加载）
       used[idx] += card.offsetHeight || 0;
     });
+  },
+
+  // V2.7.0 文档式排列：一张纸、单栏、按天分组。
+  // 为什么不逐条标日期——同一天写五条，就标五次「11 月 10 日」，读起来是日志表，
+  // 不是文章。分组之后，一天成为一个自然段，日期只出现一次。
+  docList(box, list, byId, kidCount){
+    const paper = document.createElement('div');
+    paper.className = 'masonry-col';
+    box.appendChild(paper);
+    paper.appendChild(this.docHeader(list));
+    let lastDay = '';
+    list.forEach(item=>{
+      const day = utils.dateStr(item.createdAt);
+      if(day !== lastDay){
+        lastDay = day;
+        paper.appendChild(this.docDay(item.createdAt));
+      }
+      const card = this.card(item, byId, kidCount);
+      // 文档里每块末尾只留"几点写的"：日期已经由上面的 .doc-day 说过一次，
+      // 卡片上再写一遍"2026-11-10 17:41"，同一页会出现六次同样的日期。
+      const stamp = card.querySelector('.card-time');
+      if(stamp) stamp.textContent = utils.hmStr(item.createdAt);
+      paper.appendChild(this.wrapSwipe(card));
+    });
+  },
+
+  docHeader(list){
+    const head = document.createElement('header');
+    head.className = 'doc-header';
+    const title = document.createElement('div');
+    title.className = 'doc-title';
+    title.textContent = '内核';
+    const sub = document.createElement('div');
+    sub.className = 'doc-sub';
+    sub.textContent = this.docStat(list);
+    const acts = document.createElement('div');
+    acts.className = 'doc-actions';
+    const btn = document.createElement('button');
+    btn.id = 'docExportBtn';
+    btn.className = 'text-btn';
+    btn.textContent = '导出 Markdown';
+    btn.title = '把这一页导出成 .md 文件，任何编辑器都能打开';
+    acts.appendChild(btn);
+    head.append(title, sub, acts);
+    return head;
+  },
+
+  // 「共 12 块，从 9 月 3 日写到 11 月 10 日」。
+  // 没在搜索时，这个数字说的是"内核里一共有多少块"，把收在父素材里的子碎片也算上：
+  // 它们屏幕上不重复出现，但导出的 Markdown 会带上，两处数字必须对得上，
+  // 否则同一页一边写 4 块、导出的文件写 5 块，用户会以为丢了一块。
+  docStat(shown){
+    const searching = !!state.search.trim();
+    const all = searching ? shown : state.items.filter(x=>x.space === 'core');
+    const ts = all.map(x=>x.createdAt).filter(Boolean).sort((a,b)=>a-b);
+    const dm = t=>{ const d=new Date(t); return `${d.getMonth()+1} 月 ${d.getDate()} 日`; };
+    let s = `共 ${all.length} 块`;
+    if(ts.length){
+      const a = dm(ts[0]), b = dm(ts[ts.length-1]);
+      // "8 日写到"之间不留空格：那是中文里的连接，不是数字和量词之间该断的地方
+      s += a === b ? `，写于 ${a}` : `，从 ${a}写到 ${b}`;
+    }
+    return s;
+  },
+
+  docDay(ts){
+    const d = new Date(ts);
+    const el = document.createElement('div');
+    el.className = 'doc-day';
+    const now = new Date();
+    const year = d.getFullYear() === now.getFullYear() ? '' : `${d.getFullYear()} 年 `;
+    el.textContent = `${year}${d.getMonth()+1} 月 ${d.getDate()} 日 · 周${'日一二三四五六'[d.getDay()]}`;
+    return el;
   },
 
   // 容器宽度变化（抽屉开合、横竖屏）导致列数改变时才重建；高度变化不触发
@@ -1640,7 +1785,8 @@ const render = {
     // 一张 16:9 的横幅封面会把卡片撑成广告位。
     if(item.coverImg){
       const wrap = document.createElement('div');
-      wrap.className = 'card-img-wrap';
+      // cover-wrap 只为一件事存在：文档视图里要把它缩成 240px 的配图（见 CSS）
+      wrap.className = 'card-img-wrap cover-wrap';
       wrap.style.aspectRatio = '1';
       const img = document.createElement('img');
       img.className = 'card-img cover';
@@ -1711,6 +1857,7 @@ const render = {
     const meta = document.createElement('div');
     meta.className = 'card-meta';
     const time = document.createElement('span');
+    time.className = 'card-time';
     time.textContent = utils.formatTime(item.createdAt);
     meta.appendChild(time);
     // V2.5.7：这条素材里还收着几块碎片。关联是这套东西的主线功能，但收完回到列表，
@@ -2268,6 +2415,9 @@ const render = {
       tab.classList.toggle('active', tab.dataset.space===state.currentSpace);
     });
     $('#spaceHint').textContent = SPACE_NAMES[state.currentSpace];
+    // V2.7.0：让样式层知道现在是哪个空间。内核页的录入区要跟着收窄到文档宽度，
+    // 否则上面一条通栏输入框、下面一页窄文档，看着是两件不相干的事。
+    document.body.dataset.space = state.currentSpace;
   },
 
   // 标签 chips
@@ -2458,6 +2608,127 @@ const backup = {
       $('#backupDirBtn').textContent = '✓ 备份文件夹已连接';
       toast('已连接，之后将静默覆盖备份到该文件夹');
     }catch(e){ /* 用户取消，什么都不做 */ }
+  }
+};
+
+/* ============================================================
+ * V2.7.0 内核导出：把这一页变成一篇 Markdown
+ * 跟「导出备份」分工不同，别混为一件事：
+ *   备份是给机器还原的——JSON，含图片 Base64、全部字段，一个 bit 都不能少；
+ *   这里是给人读的——.md，只留正文、当时感受、标签、日期。
+ * 所以默认不塞图片：一张压缩过的照片就有 100KB Base64，十条带图能让文件涨到几 MB，
+ * 而且 Base64 是一条几十万字符的长行，不少编辑器会直接卡死。
+ * 图片不会因此丢掉——它们本来就在备份里。
+ * ============================================================ */
+const kernelDoc = {
+  // 纯字符串拼装，不碰 DOM，方便在测试页里直接断言输出
+  build(items, withImages=false){
+    const p = n=>String(n).padStart(2,'0');
+    const dayOf = ts=>{ const d=new Date(ts); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+    const hmOf = utils.hmStr;   // 跟文档页卡片上的落款时间是同一套格式
+
+    // 导出的是文章，从早到晚读；屏幕上倒序是为了"最近的在眼前"，两件事不冲突
+    const list = items.slice().sort((a,b)=>a.createdAt-b.createdAt);
+    const byId = new Map(list.map(x=>[x.id,x]));
+
+    // 子素材跟着父素材出现，不按自己的时间戳插队——否则一段完整的思考会被时间劈成两半。
+    // 父素材已经没了的（旧备份、跨设备合并留下的孤儿），当作独立一块处理。
+    const kids = new Map();
+    list.forEach(x=>{
+      if(x.parentId && byId.has(x.parentId)){
+        if(!kids.has(x.parentId)) kids.set(x.parentId, []);
+        kids.get(x.parentId).push(x);
+      }
+    });
+    const tops = list.filter(x=>!(x.parentId && byId.has(x.parentId)));
+
+    // 每一段单独成元素，最后用空行连起来。
+    // 这样不必跟"字段可能为空"搏斗：没有的空字段直接不产生元素，
+    // 也就不会在拼接后留下一串连续空行。
+    const blocks = [];
+    blocks.push('# 灵感收纳盒 · 内核');
+    blocks.push(`> 导出于 ${dayOf(Date.now())} ${hmOf(Date.now())} · 共 ${list.length} 块 · 按写作时间排列`);
+
+    const write = (it, isKid)=>{
+      const parts = [];
+      if(isKid){
+        const pt = (byId.get(it.parentId).content||'').trim().replace(/\s+/g,' ');
+        parts.push(`> ↳ 属于「${pt.length > 16 ? pt.slice(0,16)+'…' : pt}」`);
+      }
+      const body = (it.content||'').trim();
+      if(body) parts.push(body);
+      // 图紧跟正文：它说的是同一件事。放在标签后面会被读成"另起一段的插图"
+      if(it.image){
+        parts.push(withImages ? `![图片](${it.image})` : '> 🖼 图片未随文导出，在 App 内查看');
+      }
+      // 当时感受：跟卡片上一样用引用块，它是"听到时身体里的反应"，不是正文
+      if(it.comments && it.comments.trim()){
+        parts.push(it.comments.trim().split('\n').map(l=>'> '+l).join('\n'));
+      }
+      if(it.linkUrl) parts.push(`歌：[${it.linkUrl}](${it.linkUrl})`);
+      if(it.tags && it.tags.length) parts.push(it.tags.map(t=>'`#'+t+'`').join(' '));
+      // 时间戳落在每块的末尾：它同时是这个人的写作节奏，也是一条天然的分段记号——
+      // 有了它就不必再用 --- 在短句之间画一堆横线。
+      parts.push(`*${hmOf(it.createdAt)}*`);
+      blocks.push(parts.join('\n\n'));
+    };
+
+    let lastDay = '';
+    tops.forEach(it=>{
+      const d = dayOf(it.createdAt);
+      if(d !== lastDay){ lastDay = d; blocks.push(`## ${d}`); }
+      write(it, false);
+      (kids.get(it.id) || []).forEach(k=>write(k, true));
+    });
+
+    return blocks.join('\n\n') + '\n';
+  },
+
+  async run(){
+    // 导出"整篇内核"，不跟着搜索词走：搜着「色彩」点导出得到半篇文档，
+    // 而用户会以为整页都在这儿了。
+    const items = state.items.filter(x=>x.space === 'core');
+    if(!items.length){ toast('内核还是空的，没有可导出的内容'); return; }
+
+    const imgs = items.filter(x=>x.image);
+    let withImages = false;
+    if(imgs.length){
+      // 800KB 以内直接带上——小图打开不卡，不必为这点体积打扰人；
+      // 超过就问一句，因为代价用户看不见：文件会从 20KB 变成好几 MB。
+      const bytes = imgs.reduce((s,x)=>s + Math.floor(x.image.length * 0.75), 0);
+      if(bytes <= 800*1024){
+        withImages = true;
+      }else{
+        withImages = confirm(
+          `这 ${imgs.length} 块碎片带图片，连图导出约 ${(bytes/1048576).toFixed(1)}MB，`
+          + '有些编辑器会打不开。\n\n'
+          + '确定：连图片一起导出\n'
+          + '取消：只导出文字（图片在「导出备份」里一张都不会少）'
+        );
+      }
+    }
+
+    const md = this.build(items, withImages);
+    const name = `灵感收纳盒·内核-${utils.dateStr()}.md`;
+    const size = new Blob([md]).size;
+
+    // 手机上优先走系统分享：能直接存进「文件」或发微信，比沉到"下载"文件夹好找
+    if(utils.isTouch && navigator.canShare){
+      try{
+        const file = new File([md], name, {type:'text/markdown'});
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({files:[file], title:'灵感收纳盒 · 内核'});
+          toast(`已生成 ${items.length} 块碎片的 Markdown`);
+          return;
+        }
+      }catch(err){
+        if(err && err.name === 'AbortError') return;   // 用户自己取消，不算失败
+        console.warn('分享失败，改为下载：', err);
+      }
+    }
+
+    utils.download(name, md, 'text/markdown');
+    toast(`已导出 ${items.length} 块 · ${(size/1024).toFixed(0)}KB`);
   }
 };
 
@@ -3610,6 +3881,9 @@ function bindEvents(){
       await removeFragment(Number(w.dataset.id));
       return;
     }
+
+    // V2.7.0：文档头的导出按钮不在 .card 里，必须赶在下面那道 .card 拦截之前接住
+    if(e.target.closest('#docExportBtn')){ await kernelDoc.run(); return; }
 
     const delBtn = e.target.closest('[data-action="delete"]');
     const cardEl = e.target.closest('.card');

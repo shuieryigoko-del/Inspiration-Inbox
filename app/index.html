@@ -409,6 +409,9 @@
   }
   .drawer-link-btn:hover{opacity:.75;}
   .drawer-section{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);}
+  /* V2.5.4：抽屉里的换空间分段。复用顶栏那套 .seg/.tab，只是按钮更高一点 */
+  .drawer-seg .tab{padding:9px 4px;font-size:14px;}
+  .drawer-seg .tab[disabled]{cursor:default;}
   .drawer-section-title{font-size:13px;color:var(--text-2);letter-spacing:0;margin-bottom:10px;}
   .link-kids{display:flex;flex-direction:column;gap:6px;}
   .link-kid{
@@ -571,7 +574,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.3</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.4</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -736,7 +739,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.3';
+const APP_VERSION = '2.5.4';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1360,6 +1363,32 @@ const render = {
       wrap.appendChild(unlinkBtn);
       body.appendChild(wrap);
     }
+
+    // V2.5.4：换空间。线上从 v1 起就没有任何把碎片从冷库挪到工作台的办法，
+    // 碎片只能进不能出——这是功能缺口，不是这次改样式造成的回退。
+    // 只给"没有父素材"的顶层碎片入口：子素材跟着父素材走，单独挪会让它
+    // 在目标空间里也看不见（visibleItems 按 space 过滤后又被 folded 折叠）。
+    if(!item.parentId && !state.linkingParentId && depth <= 1){
+      const sec = document.createElement('div');
+      sec.className = 'drawer-section';
+      const title = document.createElement('div');
+      title.className = 'drawer-section-title';
+      title.textContent = '移到';
+      sec.appendChild(title);
+      const seg = document.createElement('div');
+      seg.className = 'seg drawer-seg';
+      Object.keys(SPACE_NAMES).forEach(sp=>{
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tab' + (item.space === sp ? ' active' : '');
+        b.dataset.moveSpace = sp;
+        b.textContent = SPACE_NAMES[sp];
+        if(item.space === sp) b.disabled = true;   // 当前所在空间，点了也没事发生
+        seg.appendChild(b);
+      });
+      sec.appendChild(seg);
+      body.appendChild(sec);
+    }
   },
 
   // V2.5.2：抽屉开关会让位，可用宽度变了，列数可能跨断点。
@@ -1542,6 +1571,39 @@ const render = {
     cloudSync.schedule();
     backup.run(false);
     toast('已放回主流，素材仍完整保留');
+  },
+
+  /* ---------- V2.5.4：换空间 ---------- */
+
+  // 把当前详情里的碎片挪到另一个空间。碎片在冷库/工作台/内核之间的唯一出口。
+  // 子素材一并搬走——否则父素材换了空间，子素材还留在原空间的 space 字段里，
+  // 上帝视角一开就会有一批碎片出现在错的页签下。
+  async moveSpace(space){
+    const item = state.items.find(x=>x.id===state.drawerId);
+    if(!item) return;
+    if(!SPACE_NAMES[space] || item.space === space) return;
+    const from = item.space;
+    const now = Date.now();
+    const kids = state.items.filter(x=>x.parentId === item.id);
+    item.space = space;
+    item.updatedAt = now;        // 关键：LWW 靠它把"已换空间"同步到其他设备
+    kids.forEach(k=>{ k.space = space; k.updatedAt = now; });
+    try{
+      await db.updateItem(item);
+      for(const k of kids) await db.updateItem(k);
+    }catch(err){
+      console.error(err);
+      item.space = from;
+      kids.forEach(k=>{ k.space = from; });
+      toast('移动失败，请查看控制台');
+      return;
+    }
+    this.cancelEdit();
+    this.closeDrawer();
+    this.cards();                // 这条已经不属于当前空间，列表要少一条
+    cloudSync.schedule();
+    backup.run(false);
+    toast(`已移到「${SPACE_NAMES[space]}」`);
   },
 
   /* ---------- V2.0 第五步：上帝视角 ---------- */
@@ -2644,6 +2706,8 @@ function bindEvents(){
   $('#drawerBody').addEventListener('click', (e)=>{
     if(e.target.closest('#drawerLinkBtn')){ render.startLink(); return; }
     if(e.target.closest('#drawerUnlinkBtn')){ render.unlink(); return; }   // V2.0 第三步：剥离
+    const mv = e.target.closest('[data-move-space]');                      // V2.5.4：换空间
+    if(mv){ if(!mv.disabled) render.moveSpace(mv.dataset.moveSpace); return; }
     const kid = e.target.closest('.link-kid');   // V2.0 第二步：点条目推入子素材详情
     if(kid) render.pushChild(Number(kid.dataset.kidId));
   });

@@ -641,6 +641,24 @@
   .music-link .music-link-go{margin-left:auto;flex:0 0 auto;font-weight:500;}
   .drawer-link{margin-bottom:16px;}
 
+  /* V2.7.1：本地音频在别的设备上的占位条。
+     长得像 .music-link 但故意不用主色——它不是按钮，点它什么也不会发生，
+     用蓝色会让人以为点得动。 */
+  .music-local{
+    display:flex;align-items:center;gap:6px;
+    margin-top:10px;padding:7px 10px;border-radius:8px;
+    background:var(--fill);color:var(--text-2);
+    font-size:13px;overflow:hidden;
+  }
+  .music-local .music-local-icon{flex:0 0 auto;opacity:.55;}
+  .music-local .music-local-txt{
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .music-local .music-local-hint{
+    margin-left:auto;flex:0 0 auto;
+    font-size:11.5px;color:var(--text-2);opacity:.7;
+  }
+
   /* 当时感受：一道 2px 的蓝，跟播放键同色 —— 这张卡上蓝色只表示"声音" */
   .music-quote{
     margin-top:12px;padding-left:11px;
@@ -798,7 +816,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.7.0</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.7.1</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -1018,7 +1036,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.7.1';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -1463,6 +1481,30 @@ function musicLinkEl(item){
   return a;
 }
 
+// V2.7.1：这块的音频是本地文件，没跟着云同步过来。
+// 不画播放条——没有可播的东西，画了就是个死按钮；但必须留一行说明。
+// 否则在另一台设备上，这块音乐卡只剩封面和感受，看着像同步把音频吞了。
+function localAudioEl(item){
+  const box = document.createElement('div');
+  box.className = 'music-local';
+  box.title = '这段音频是本地文件（几 MB），不跟随云同步。在导入它的那台设备上可以播放。';
+  const icon = document.createElement('span');
+  icon.className = 'music-local-icon';
+  icon.textContent = '♪';
+  const txt = document.createElement('span');
+  txt.className = 'music-local-txt';
+  txt.textContent = item.audioName
+    ? item.audioName
+    : '本地音频';
+  const hint = document.createElement('span');
+  hint.className = 'music-local-hint';
+  hint.textContent = '原设备可播';
+  box.appendChild(icon);
+  box.appendChild(txt);
+  box.appendChild(hint);
+  return box;
+}
+
 const render = {
   // 总入口：数据/状态变化后调用
   all(){
@@ -1825,6 +1867,7 @@ const render = {
     // V2.6.1：没有音频直链、只有分享链接时，换成一行「去听」。
     if(item.audioUrl) body.appendChild(audio.build(item, false));
     else if(item.linkUrl) body.appendChild(musicLinkEl(item));
+    else if(item.localAudio) body.appendChild(localAudioEl(item));
 
     // 当时感受。单独拎出来加一道蓝线，是因为它和随想不是一回事：
     // 一句是听到时身体里的反应，一句是事后想说的。
@@ -1946,6 +1989,8 @@ const render = {
       }
     }else if(item.linkUrl){
       body.appendChild(musicLinkEl(item));
+    }else if(item.localAudio){
+      body.appendChild(localAudioEl(item));
     }
     if(item.comments && item.comments.trim()){
       const q = document.createElement('div');
@@ -2741,6 +2786,10 @@ const kernelDoc = {
 const GIST_API = 'https://api.github.com';
 const GIST_FILENAME = 'inspiration-inbox-sync.json';
 const PBKDF2_ITER = 150000;
+// V2.7.1：走独立加密附件的字段对（值字段 → 指纹字段）。
+// 正文图和封面共用同一套"内容寻址 + 去重 + 增量下载"机制，
+// 以后再加第三类附件（比如音频波形图）只改这一行。
+const ATT_KEYS = [['image','imageRef'], ['coverImg','coverRef']];
 
 const cloudSync = {
   busy:false,
@@ -2816,10 +2865,19 @@ const cloudSync = {
   _strip(frag){
     const c = Object.assign({}, frag);
     delete c.image;
+    // V2.7.1：封面也得剥。V2.6.1 加音乐封面时漏了这一处，封面 Base64（40-60KB）
+    // 全塞在主文件里，十来张就把主文件撑到半兆——跟"主文件只存索引"的设计直接打架，
+    // 而注释还写着"主文件已只有几十 KB"。现在它跟正文图一样走独立附件。
+    delete c.coverImg;
     // V2.6.3：本地音频（data:audio/…）不进同步。一条几 MB 的 Base64 塞进 Gist
     // 必然超时，而它在另一台设备上也没有意义——文件本来就在这台手机里。
     // 分享链接和直链是 http 开头，只有几十字节，照传。
-    if(/^data:audio\//i.test(c.audioUrl || '')) delete c.audioUrl;
+    // V2.7.1：删本体时必须留个记号。否则另一台设备上这块音乐卡只剩封面和感受，
+    // 连"这儿本来有段音频"都看不出来，用户只会以为同步把数据弄丢了。
+    if(/^data:audio\//i.test(c.audioUrl || '')){
+      delete c.audioUrl;
+      c.localAudio = true;
+    }
     return c;
   },
 
@@ -2926,6 +2984,21 @@ const cloudSync = {
       const old = byId.get(x.id);
       if(!old || stamp(x) >= stamp(old)) byId.set(x.id, x);
     });
+    // V2.7.1：音频本体不参与同步，所以远端版本里根本没有 audioUrl。
+    // 若听凭"时间戳新的赢"，在 iPad 上改一个标签就会把手机里那段音频抹掉，
+    // 而且毫无提示——下一次本机推送时它也跟着没了（因为合并结果已经不含它）。
+    // 凡是本机存着 data:audio、合并结果却没有的，一律救回来。
+    // 真想删掉它，得在有这段音频的设备上删：那时本机也不存在，自然救不回来。
+    const localById = new Map(localItems.map(x=>[x.id, x]));
+    byId.forEach(f=>{
+      const src = localById.get(f.id);
+      if(src && !f.audioUrl && /^data:audio\//i.test(src.audioUrl || '')){
+        f.audioUrl   = src.audioUrl;
+        f.audioName  = src.audioName;
+        f.audioSize  = src.audioSize;
+        f.localAudio = true;
+      }
+    });
     const tombs = this._pruneTombs([...localTombs, ...((remote && remote.deletedIds) || [])]);
     const dead = new Set(tombs.map(t=>t.id));
     return { fragments:[...byId.values()].filter(x=>!dead.has(x.id)), tombstones:tombs };
@@ -3018,24 +3091,34 @@ const cloudSync = {
         mergedTombstones = merged.tombstones;
       }
 
-      // ① 本机有图但没有指纹的旧碎片（V1.5.1 前数据）：补算内容指纹
+      // ① 本机有图但没有指纹的旧碎片（V1.5.1 前数据）：补算内容指纹。
+      // V2.7.1：封面也补——它是这一版才开始走附件的，老数据全带着 Base64 却没有 coverRef。
       let refsAssigned = false;
       for(const f of mergedFragments){
-        if(f.image && !f.imageRef){ f.imageRef = await this._sha256Hex(f.image); refsAssigned = true; }
+        for(const [valKey, refKey] of ATT_KEYS){
+          if(f[valKey] && !f[refKey]){ f[refKey] = await this._sha256Hex(f[valKey]); refsAssigned = true; }
+        }
       }
 
       // ② 碎片有指纹却没有图片（v2 远端/或远端较新版本）：只下载缺失的那几张
       if(!notModified){
         for(const f of mergedFragments){
-          if(f.image || !f.imageRef) continue;
-          let attId = attMap[f.imageRef];
-          if(!attId) attId = await this._findAttGist(token, f.imageRef); // 清单缺失时按指纹兜底找回
-          if(!attId){
-            // 找不到附件必须中止：否则会把"无图版本"合并后推上去，覆盖还存着图片的设备
-            throw new Error('云端缺少图片附件（'+f.imageRef.slice(0,8)+'…），请在存有这张图的设备上先同步一次');
+          for(const [valKey, refKey] of ATT_KEYS){
+            if(f[valKey] || !f[refKey]) continue;
+            let attId = attMap[f[refKey]];
+            if(!attId) attId = await this._findAttGist(token, f[refKey]); // 清单缺失时按指纹兜底找回
+            if(!attId){
+              // 正文图找不到必须中止：否则会把"无图版本"合并后推上去，覆盖还存着图片的设备。
+              // 封面丢了不影响这块碎片的语义（还有文字和感受），跳过就好，
+              // 不值得为一张封面把整次同步卡死。
+              if(valKey === 'image'){
+                throw new Error('云端缺少图片附件（'+f[refKey].slice(0,8)+'…），请在存有这张图的设备上先同步一次');
+              }
+              continue;
+            }
+            f[valKey] = await this._fetchAtt(token, attId, aesKey);
+            attMap[f[refKey]] = attId;
           }
-          f.image = await this._fetchAtt(token, attId, aesKey);
-          attMap[f.imageRef] = attId;
         }
         await db.applyMerge(mergedFragments, mergedTombstones.map(t=>t.id));
         await db.setSetting('tombstones', mergedTombstones);
@@ -3058,15 +3141,31 @@ const cloudSync = {
 
       // ③ 每张图一个独立加密 gist：只建缺失的；同内容指纹全局只传一次
       const neededRefs = new Set();
-      mergedFragments.forEach(f=>{ if(f.imageRef) neededRefs.add(f.imageRef); });
+      mergedFragments.forEach(f=>{
+        for(const [valKey, refKey] of ATT_KEYS){ if(f[refKey]) neededRefs.add(f[refKey]); }
+      });
       const missingRefs = [...neededRefs].filter(r=>!attMap[r]);
       let createdCount = 0;
       for(let i=0;i<missingRefs.length;i++){
         const ref = missingRefs[i];
         if(missingRefs.length >= 3) this._uiBusy(true, '迁移图片 '+(i+1)+'/'+missingRefs.length);
-        const holder = mergedFragments.find(f=>f.imageRef===ref && f.image);
-        if(!holder) throw new Error('本地缺少待上传图片（'+ref.slice(0,8)+'…）');
-        attMap[ref] = await this._ensureAttGist(token, ref, holder.image, aesKey);
+        // 这个指纹对应的是正文图还是封面？两套字段共用一张 attMap，只能回头查一下
+        let body = null;
+        for(const f of mergedFragments){
+          for(const [valKey, refKey] of ATT_KEYS){
+            if(f[refKey] === ref && f[valKey]){ body = f[valKey]; break; }
+          }
+          if(body) break;
+        }
+        if(body === null){
+          // 封面附件本机也没有？跳过，下次同步再试。正文图缺了必须停——
+          // 否则会把"无图版本"推上去覆盖别的设备
+          if(mergedFragments.some(f=>f.imageRef === ref)){
+            throw new Error('本地缺少待上传图片（'+ref.slice(0,8)+'…）');
+          }
+          continue;
+        }
+        attMap[ref] = await this._ensureAttGist(token, ref, body, aesKey);
         createdCount++;
       }
 

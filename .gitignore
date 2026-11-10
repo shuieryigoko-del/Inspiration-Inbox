@@ -24,3 +24,11 @@ desktop.ini
 
 # WorkBuddy 本地项目数据（记忆、缓存）
 .workbuddy/
+
+# 本地预览副本（含演示数据，不发布）
+app/_preview.html
+# 外部参考资料与设计探索稿
+.tmp_refs/
+.tmp_frames/
+design/
+backups/code/

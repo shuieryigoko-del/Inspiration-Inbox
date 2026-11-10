@@ -10,45 +10,62 @@
      复古未来主义：微圆角 / 柔和阴影 / 毛玻璃 / 日夜双模式（CSS 变量）
      ============================================================ -->
 <style>
-  /* ---------- 主题变量：日间（银白流线） ---------- */
+  /* ---------- 主题变量：日间（系统浅色） ----------
+     V2.5 换肤：从"紫色流线"改成系统色。
+     关键变化是 --shadow 归零：原来每张卡都有投影，那是"卡片套件"的典型特征；
+     系统里只有一层背景 + 一张纯白卡，层次靠圆角与分隔线，不靠影子。 */
   :root{
-    --bg:#F5F5F7;
+    --bg:#F2F2F7;
     --card:#FFFFFF;
-    --text:#1D1D1F;
-    --text-2:#6E6E73;
-    --accent:#5E5CE6;
-    --accent-soft:rgba(94,92,230,.10);
-    --border:rgba(0,0,0,.06);
-    --shadow:0 4px 20px rgba(0,0,0,.06);
-    --shadow-hover:0 10px 32px rgba(0,0,0,.10);
-    --glass:rgba(255,255,255,.72);
-    --scrim:rgba(245,245,247,.45);
+    --text:#1C1C1E;
+    --text-2:#8E8E93;
+    --accent:#007AFF;
+    --accent-soft:rgba(0,122,255,.10);
+    --border:rgba(60,60,67,.14);
+    --sep:rgba(60,60,67,.22);
+    --shadow:none;
+    --shadow-hover:none;
+    --glass:rgba(255,255,255,.86);
+    --scrim:rgba(0,0,0,.16);
     --danger:#FF3B30;
+    --fill:rgba(118,118,128,.12);
+    --card-hover:#F7F7FA;
+    --seg-active:#FFFFFF;
+    --r-card:12px;
+    --seg-shadow:0 3px 8px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.04);
   }
-  /* ---------- 主题变量：夜间（太空曜石） ---------- */
+  /* ---------- 主题变量：夜间（系统深色） ---------- */
   [data-theme="dark"]{
-    --bg:#0F0F11;
+    --bg:#000000;
     --card:#1C1C1E;
-    --text:#F2F2F7;
-    --text-2:#98989F;
-    --accent:#7D7BFF;
-    --accent-soft:rgba(125,123,255,.16);
-    --border:rgba(255,255,255,.08);
-    --shadow:0 4px 20px rgba(0,0,0,.45);
-    --shadow-hover:0 10px 32px rgba(0,0,0,.6);
-    --glass:rgba(28,28,30,.72);
-    --scrim:rgba(15,15,17,.5);
+    --text:#FFFFFF;
+    --text-2:#8E8E93;
+    --accent:#0A84FF;
+    --accent-soft:rgba(10,132,255,.16);
+    --border:rgba(84,84,88,.42);
+    --sep:rgba(84,84,88,.6);
+    --shadow:none;
+    --shadow-hover:none;
+    --glass:rgba(28,28,30,.86);
+    --scrim:rgba(0,0,0,.5);
     --danger:#FF453A;
+    --fill:rgba(118,118,128,.24);
+    --card-hover:#242426;
+    --seg-active:#5A5A5E;
+    --seg-shadow:0 3px 8px rgba(0,0,0,.5);
   }
 
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
   body{
-    font-family:"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
+    /* 系统字体栈：不引入自定义字体，Windows 落到微软雅黑、鸿蒙落到 HarmonyOS Sans。
+       V2.5 去掉了原来的 letter-spacing:.5px —— 中文加字距会显得松散，
+       系统界面的紧凑感来自字号与行高，不来自字距。 */
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",
+      "HarmonyOS Sans SC","Microsoft YaHei",system-ui,sans-serif;
     background:var(--bg);
     color:var(--text);
-    letter-spacing:.5px;
-    line-height:1.65;
+    line-height:1.5;
     transition:background .3s ease,color .3s ease;
     -webkit-font-smoothing:antialiased;
     padding-bottom:80px;
@@ -60,184 +77,214 @@
   /* 触屏设备：按钮留足 44px 触控热区 */
   @media (pointer:coarse){
     .icon-btn{width:42px;height:42px;}
-    .text-btn{padding:10px 15px;font-size:14px;}
-    .tab{padding:11px 22px;}
+    .text-btn{padding:9px 14px;font-size:14px;}
+    .tab{padding:9px 18px;}
   }
-  ::placeholder{color:var(--text-2);opacity:.7;}
+  ::placeholder{color:var(--text-2);opacity:.8;}
 
-  /* ---------- 顶部栏（毛玻璃吸顶） ---------- */
+  /* ---------- 顶部栏 ---------- */
   .topbar{
     position:sticky;top:0;z-index:40;
-    display:flex;align-items:center;gap:14px;
-    padding:calc(12px + env(safe-area-inset-top)) 22px 12px;
+    display:flex;align-items:center;gap:12px;
+    padding:calc(10px + env(safe-area-inset-top)) 20px 10px;
     background:var(--glass);
-    -webkit-backdrop-filter:blur(14px) saturate(1.6);
-    backdrop-filter:blur(14px) saturate(1.6);
+    -webkit-backdrop-filter:blur(20px) saturate(1.8);
+    backdrop-filter:blur(20px) saturate(1.8);
     border-bottom:1px solid var(--border);
     flex-wrap:wrap;
   }
-  .logo{font-weight:600;font-size:17px;letter-spacing:2px;white-space:nowrap;}
-  .logo small{display:block;font-size:10px;font-weight:400;color:var(--text-2);letter-spacing:1px;}
+  /* 中文当主标题、英文退为副标 —— 反过来就是"外国产品的中文版"观感 */
+  .logo{font-weight:600;font-size:17px;white-space:nowrap;letter-spacing:0;}
+  .logo small{display:block;font-size:9.5px;font-weight:400;color:var(--text-2);}
   .search-box{
-    flex:1;min-width:180px;max-width:440px;
-    display:flex;align-items:center;gap:8px;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:999px;
-    padding:8px 16px;
-    box-shadow:var(--shadow);
+    flex:1;min-width:150px;max-width:300px;
+    display:flex;align-items:center;gap:7px;
+    background:var(--fill);
+    border:none;
+    border-radius:10px;
+    padding:7px 10px;
   }
-  .search-box input{flex:1;border:none;outline:none;background:transparent;font-size:14px;}
-  .top-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;}
+  .search-box input{flex:1;border:none;outline:none;background:transparent;font-size:17px;}
+  .top-actions{display:flex;align-items:center;gap:2px;margin-left:auto;flex-wrap:wrap;}
   .icon-btn{
-    width:38px;height:38px;border-radius:12px;
+    width:32px;height:32px;border-radius:8px;
     display:flex;align-items:center;justify-content:center;
-    font-size:17px;background:var(--card);border:1px solid var(--border);
-    box-shadow:var(--shadow);
-    transition:transform .15s ease,box-shadow .15s ease;
+    font-size:16px;background:transparent;border:none;
+    color:var(--accent);
+    transition:background-color .15s ease;
   }
-  .icon-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-hover);}
+  .icon-btn:hover{background:var(--fill);}
   .text-btn{
-    padding:8px 14px;border-radius:12px;font-size:13px;
-    background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);
-    transition:transform .15s ease,box-shadow .15s ease;white-space:nowrap;
+    padding:7px 10px;border-radius:8px;font-size:13px;
+    background:transparent;border:none;
+    color:var(--accent);
+    font-weight:400;
+    transition:background-color .15s ease;white-space:nowrap;
   }
-  .text-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-hover);}
+  .text-btn:hover{background:var(--fill);}
   .backup-reminder{font-size:11px;color:var(--text-2);white-space:nowrap;max-width:150px;}
   .backup-reminder.warn{color:var(--danger);font-weight:600;}
 
-  /* ---------- Tab 栏（三层空间） ---------- */
-  .tabs{display:flex;gap:10px;padding:18px 22px 6px;max-width:1200px;margin:0 auto;width:100%;}
-  .tab{
-    padding:9px 22px;border-radius:999px;font-size:14px;
-    color:var(--text-2);background:var(--card);
-    border:1px solid var(--border);box-shadow:var(--shadow);
-    transition:all .2s ease;
+  /* ---------- 空间切换：分段控件 ---------- */
+  /* V2.5：三个空间原本是三枚带投影的胶囊，各占一块面积；
+     分段控件把它们收进一个灰槽里，谁被选中由"白底浮起"表示，
+     页面上因此少掉两个按钮的视觉重量。 */
+  .tabs{
+    display:flex;align-items:center;gap:10px;
+    padding:14px 20px 0;max-width:720px;margin:0 auto;width:100%;
   }
-  .tab .tab-sub{font-size:10px;opacity:.7;margin-left:6px;letter-spacing:0;}
-  .tab.active{background:var(--accent);color:#fff;border-color:transparent;
-    box-shadow:0 6px 18px var(--accent-soft);}
-  /* V2.0 第五步：上帝视角开关——视角类控件，放在空间 Tab 这一排的右端 */
+  .seg{
+    display:flex;gap:2px;padding:2px;flex:1;min-width:0;
+    background:var(--fill);border-radius:9px;
+  }
+  .tab{
+    flex:1 1 0;min-width:0;
+    padding:7px 4px;border-radius:7px;
+    font-size:13px;font-weight:500;
+    color:var(--text);background:transparent;border:none;
+    transition:background-color .18s ease,box-shadow .18s ease;
+    white-space:nowrap;
+  }
+  .tab .tab-sub{display:none;}
+  .tab.active{
+    background:var(--seg-active);
+    box-shadow:var(--seg-shadow);
+    font-weight:600;
+  }
+  /* V2.0 第五步：上帝视角开关——视角类控件，放在分段控件右侧 */
   .god-toggle{
-    margin-left:auto;padding:9px 15px;border-radius:999px;font-size:13px;
-    color:var(--text-2);background:var(--card);border:1px solid var(--border);
-    box-shadow:var(--shadow);white-space:nowrap;
-    transition:color .2s ease,background .2s ease,border-color .2s ease;
+    flex:0 0 auto;
+    padding:7px 11px;border-radius:9px;font-size:13px;
+    color:var(--text-2);background:var(--fill);border:none;
+    white-space:nowrap;
+    transition:color .2s ease,background-color .2s ease;
   }
   .god-toggle:hover{color:var(--text);}
-  .god-toggle.on{background:var(--accent);color:#fff;border-color:transparent;
-    box-shadow:0 6px 18px var(--accent-soft);}
+  .god-toggle.on{background:var(--accent);color:#fff;}
 
   /* ---------- 录入区 ---------- */
+  /* 宽度对齐到"卡片本体"，不是对齐到列容器 —— 否则白色块的边缘会比列表多出 20px */
   .composer{
-    max-width:760px;margin:14px auto 8px;width:calc(100% - 44px);
-    background:var(--card);border:1px solid var(--border);border-radius:16px;
-    box-shadow:var(--shadow);padding:18px 20px;
+    max-width:680px;margin:12px auto 8px;width:calc(100% - 40px);
+    background:var(--card);border:none;border-radius:var(--r-card);
+    padding:12px 16px 10px;
   }
   .composer textarea{
-    width:100%;min-height:74px;border:none;outline:none;resize:vertical;
-    background:transparent;font-size:16px;line-height:1.7;
+    width:100%;min-height:52px;border:none;outline:none;resize:vertical;
+    background:transparent;font-size:17px;line-height:1.5;
   }
-  .tag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;}
+  .tag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;}
   .tag-chip{
     display:inline-flex;align-items:center;gap:5px;
-    background:var(--accent-soft);color:var(--accent);
-    font-size:12px;padding:3px 10px;border-radius:999px;
+    background:var(--fill);color:var(--text);
+    font-size:13px;padding:3px 9px;border-radius:7px;
   }
-  .tag-chip button{font-size:13px;line-height:1;color:var(--accent);opacity:.6;}
-  .tag-chip button:hover{opacity:1;}
-  .tag-input{border:none;outline:none;background:transparent;font-size:16px;
+  .tag-chip button{font-size:13px;line-height:1;color:var(--text-2);opacity:1;}
+  .tag-chip button:hover{color:var(--danger);}
+  .tag-input{border:none;outline:none;background:transparent;font-size:17px;
     min-width:120px;flex:1;padding:4px 0;}
-  .composer-tools{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
-  .space-hint{font-size:11px;color:var(--text-2);}
-  .space-hint b{color:var(--accent);}
-  .img-preview{position:relative;width:64px;height:64px;border-radius:12px;overflow:hidden;
+  .composer-tools{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .space-hint{font-size:13px;color:var(--text-2);}
+  .space-hint b{color:var(--text);font-weight:400;}
+  .img-preview{position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;
     border:1px solid var(--border);}
   .img-preview img{width:100%;height:100%;object-fit:cover;display:block;}
   .img-preview button{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
     background:rgba(0,0,0,.55);color:#fff;font-size:11px;line-height:18px;text-align:center;}
   .save-btn{
-    margin-left:auto;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:600;
-    color:#fff;background:linear-gradient(135deg,var(--accent),#8E8CFF);
-    box-shadow:0 6px 18px var(--accent-soft);
-    transition:transform .15s ease,box-shadow .15s ease,opacity .2s;
+    margin-left:auto;padding:8px 18px;border-radius:9px;font-size:15px;font-weight:600;
+    color:#fff;background:var(--accent);
+    transition:opacity .2s ease;
   }
-  .save-btn:hover{transform:translateY(-1px);}
-  .save-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+  .save-btn:hover{opacity:.88;}
+  .save-btn:disabled{opacity:.36;cursor:not-allowed;}
 
-  /* ---------- 瀑布流（flex 分列：规避 iOS Safari CSS 多列布局偶发白块的缺陷） ---------- */
+  /* ---------- 列表：单列 ---------- */
+  /* V2.5：原来是 1–3 列瀑布流。改成单列后，每条碎片的阅读顺序是确定的，
+     且同一屏能读到的字数变少 —— 这正是"被认真看过"的感觉来源。
+     桌面端不拉满，720px 居中，接近一份文档的栏宽。 */
   .masonry{
-    max-width:1200px;margin:12px auto 0;width:100%;padding:0 22px;
-    display:flex;align-items:flex-start;gap:16px;
+    max-width:720px;margin:0 auto;width:100%;padding:0 20px;
+    display:flex;flex-direction:column;align-items:stretch;gap:0;
   }
-  .masonry-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;}
-  @media (max-width:600px){.masonry{gap:12px;}}
+  .masonry-col{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  /* V2.5：整列是一个连续白面，行与行之间一条细线，不是一堆各自悬浮的卡片。
+     这是"列表"和"卡片流"的分界：卡片流里每条都在抢注意力，
+     列表里注意力跟着阅读顺序走 —— 分隔线比间距更安静地完成这件事。 */
   .card{
-    background:var(--card);border:1px solid var(--border);border-radius:14px;
-    box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden;
-    transition:transform .18s ease,box-shadow .18s ease;cursor:pointer;position:relative;
+    background:var(--card);border:none;
+    border-radius:0;
+    margin-bottom:0;overflow:hidden;
+    transition:background-color .14s ease;cursor:pointer;position:relative;
   }
-  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);}
+  /* 分隔线从内容左边缘起，不贯穿整宽 —— iOS 的行分隔就是这个缩进，
+     画满整宽会让人读成表格的行。 */
+  .card::after{
+    content:'';position:absolute;left:16px;right:0;bottom:0;
+    height:1px;background:var(--border);
+  }
+  .card:first-child{border-radius:var(--r-card) var(--r-card) 0 0;}
+  .card:last-child{border-radius:0 0 var(--r-card) var(--r-card);}
+  .card:last-child::after{display:none;}
+  .card:only-child{border-radius:var(--r-card);}
+  .card:hover{background:var(--card-hover);}
   .card-img-wrap{width:100%;overflow:hidden;background:var(--bg);}
   .card img.card-img{width:100%;display:block;}
   .card img.card-img.cover{height:100%;object-fit:cover;}
-  .card-body{padding:13px 15px 14px;}
-  .card-content{font-size:14px;white-space:pre-wrap;word-break:break-word;}
-  /* 正文内自动识别的链接（V1.4）：品牌色 + 下划线，长链接换行不撑破卡片 */
-  .frag-link{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
+  .card-body{padding:14px 16px 15px;}
+  .card-content{font-size:17px;line-height:1.52;white-space:pre-wrap;word-break:break-word;}
+  /* 正文内自动识别的链接（V1.4）：系统蓝，不加下划线 —— 蓝色本身已足够表意 */
+  .frag-link{color:var(--accent);text-decoration:none;
     overflow-wrap:anywhere;cursor:pointer;}
-  .frag-link:hover{opacity:.8;}
-  .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
-  .card-tag{font-size:11px;color:var(--accent);background:var(--accent-soft);
-    padding:2px 9px;border-radius:999px;}
+  .frag-link:active{opacity:.55;}
+  .card-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;}
+  .card-tag{font-size:13px;color:var(--text-2);background:none;padding:0;}
   /* V2.0 第四步：搜索穿透命中的子素材，卡头标注它属于谁——
      说明这块平时藏在父素材里、因搜索才出现，避免"凭空多出一条"的错觉 */
   .card-via{
     display:inline-flex;align-items:center;gap:5px;max-width:100%;
-    margin-bottom:8px;padding:3px 9px;border-radius:999px;
-    background:var(--accent-soft);color:var(--accent);
-    font-size:11px;line-height:1.5;
+    margin-bottom:7px;
+    color:var(--text-2);
+    font-size:13px;line-height:1.4;
   }
   .card-via-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .card-meta{display:flex;justify-content:space-between;align-items:center;
-    margin-top:10px;font-size:11px;color:var(--text-2);}
+    margin-top:6px;font-size:13px;color:var(--text-2);}
   .card-del{
-    position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;
-    background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-    color:var(--text-2);font-size:14px;line-height:26px;text-align:center;
-    opacity:0;transition:opacity .15s;
+    position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;
+    background:var(--card-hover);
+    color:var(--text-2);font-size:13px;line-height:26px;text-align:center;
+    opacity:0;transition:opacity .15s,color .15s;
   }
   .card:hover .card-del{opacity:1;}
-  @media (hover:none){.card-del{opacity:.75;}}
+  @media (hover:none){.card-del{opacity:.9;}}
   .card-del:hover{color:var(--danger);}
 
   /* ---------- V2.0 父子关联（第一步：关联 + 隐藏） ---------- */
   /* 关联模式下：卡片左上角出现勾选框，删除叉隐藏，点卡片=勾选 */
   .card.linking{cursor:pointer;}
-  .card.linking:hover{transform:none;}   /* 勾选时不抬起，避免误触感 */
+  .card.linking:hover{background:var(--card);}   /* 勾选时不响应悬停底色 */
   .card.linking .card-del{display:none;}
-  .card.linking.link-self{opacity:.5;cursor:default;}
+  .card.linking.link-self{opacity:.4;cursor:default;}
   .card.selected{outline:2px solid var(--accent);outline-offset:-2px;}
   /* 勾选框故意不绝对定位：占正文上方独立一行，绝不压住碎片首行文字 */
-  .link-row{display:flex;align-items:center;gap:8px;padding:10px 12px 0;}
+  .link-row{display:flex;align-items:center;gap:9px;padding:13px 16px 0;}
   .link-check{
     width:22px;height:22px;border-radius:50%;flex:0 0 auto;
     display:flex;align-items:center;justify-content:center;
-    background:var(--bg);border:1.5px solid var(--border);
-    color:var(--text-2);font-size:13px;font-weight:700;line-height:1;
-    transition:background .15s,border-color .15s,color .15s;
+    background:transparent;border:1.5px solid var(--sep);
+    color:#fff;font-size:13px;font-weight:700;line-height:1;
+    transition:background-color .15s,border-color .15s;
   }
-  .card.selected .link-check{background:var(--accent);border-color:var(--accent);color:#fff;}
-  .link-row-hint{font-size:12px;color:var(--text-2);}
+  .card.selected .link-check{background:var(--accent);border-color:var(--accent);}
+  .link-row-hint{font-size:13px;color:var(--text-2);}
   /* 悬浮确认条：桌面居中靠下；手机端浮在半屏抽屉上方 */
   .link-bar{
     position:fixed;left:50%;bottom:24px;z-index:70;
     display:flex;align-items:center;gap:10px;
     padding:9px 12px 9px 16px;border-radius:999px;
-    background:var(--glass);border:1px solid var(--border);
-    -webkit-backdrop-filter:blur(18px) saturate(1.4);
-    backdrop-filter:blur(18px) saturate(1.4);
-    box-shadow:var(--shadow-hover);
+    background:var(--card);border:1px solid var(--border);
+    box-shadow:0 8px 34px rgba(0,0,0,.16);
     transform:translate(-50%,140%);opacity:0;pointer-events:none;
     transition:transform .28s cubic-bezier(.22,.9,.3,1),opacity .2s;
   }
@@ -266,89 +313,100 @@
   }
   .scrim.open{opacity:1;}
   /* 抽屉宽度同时用于"抽屉本体"和"打开时给背景让出的空间"（V1.4.1） */
-  :root{--drawer-w:clamp(340px,40vw,580px);}
+  :root{--drawer-w:clamp(320px,34vw,480px);}
   .drawer{
     /* V2.4.2：vh → dvh。手机浏览器（vivo/华为等）地址栏与底栏常驻时，
        vh 取的是"大视口"（不含浏览器 UI 的高度），抽屉底部会被底栏压住约 56px；
        dvh 跟随真实可视区，抽屉正好停在底栏上方。不支持的浏览器回退到 vh。 */
     position:fixed;top:0;right:0;height:100vh;height:100dvh;width:var(--drawer-w);
-    background:var(--glass);
-    -webkit-backdrop-filter:blur(20px) saturate(1.5);
-    backdrop-filter:blur(20px) saturate(1.5);
+    /* V2.5：毛玻璃换成实心卡面。磨砂在浅色底上会透出下面的卡片轮廓，
+       读长文时像隔着一层雾；详情是要被认真读的地方，必须实心。 */
+    background:var(--card);
     border-left:1px solid var(--border);
-    border-radius:18px 0 0 18px;
-    box-shadow:-12px 0 50px rgba(0,0,0,.12);
+    border-radius:0;
+    box-shadow:-1px 0 24px rgba(0,0,0,.06);
     transform:translateX(105%);transition:transform .32s cubic-bezier(.22,.9,.3,1);
     z-index:50;display:flex;flex-direction:column;
   }
   .drawer.open{transform:translateX(0);}
-  /* 抽屉打开时顶栏与瀑布流让出右侧空间，卡片不再被盖住（桌面/平板） */
+  /* V2.5：抽屉打开时不再压缩列表宽度，而是把整列平移让出位置。
+     用 transform 而不是 padding 的原因：transform 不改变布局宽度，
+     卡片不会因为"可用宽度变窄"而重新折行——文字位置整体左移，读起来是连续的。
+     只在会真的重叠的宽度区间做（>1400px 时 720+480 放得下，不需要让）。 */
+  @media(min-width:769px) and (max-width:1400px){
+    .tabs,.composer,.masonry{
+      transition:transform .32s cubic-bezier(.22,.9,.3,1);
+    }
+    body.drawer-open .tabs,
+    body.drawer-open .composer,
+    body.drawer-open .masonry{
+      /* 只用乘法：calc 里除以负数在部分 Chromium 上会被整条丢弃 */
+      transform:translateX(calc((var(--drawer-w) + 14px) * -0.5));
+    }
+  }
   @media(min-width:769px){
-    .topbar,.masonry{transition:padding-right .32s cubic-bezier(.22,.9,.3,1);}
-    body.drawer-open .topbar,
-    body.drawer-open .masonry{padding-right:calc(var(--drawer-w) + 14px);}
     /* V2.0：关联确认条居中于抽屉之外的可视区，不与抽屉重叠 */
     body.drawer-open .link-bar{left:calc((100% - var(--drawer-w)) / 2);}
   }
   /* 手机端底部抽屉的小抓条：桌面/平板不显示 */
   .drawer-grabber{display:none;}
   .drawer-size-btn{display:none;}
-  .drawer-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
-  .drawer-edit-btn{width:auto;padding:0 12px;font-size:13px;}
-  .drawer-title{font-size:13px;color:var(--text-2);flex:1;letter-spacing:1px;}
-  .drawer-body{flex:1;overflow-y:auto;padding:20px 22px 40px;}
-  .drawer-body img{width:100%;border-radius:14px;margin-bottom:16px;display:block;}
-  .drawer-content{font-size:16px;line-height:1.9;white-space:pre-wrap;word-break:break-word;}
-  .drawer-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px;}
-  .drawer-time{margin-top:22px;font-size:12px;color:var(--text-2);}
+  .drawer-head{display:flex;align-items:center;gap:4px;padding:0 12px 0 14px;min-height:57px;border-bottom:1px solid var(--border);}
+  .drawer-edit-btn{width:auto;flex:0 0 auto;padding:0 6px;font-size:15px;white-space:nowrap;}
+  .drawer-title{font-size:15px;font-weight:600;color:var(--text);flex:1;letter-spacing:0;}
+  .drawer-body{flex:1;overflow-y:auto;padding:18px 18px 40px;}
+  .drawer-body img{width:100%;border-radius:var(--r-card);margin-bottom:16px;display:block;}
+  .drawer-content{font-size:17px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+  .drawer-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;}
+  .drawer-time{margin-top:20px;font-size:13px;color:var(--text-2);}
   /* V2.0：抽屉内的关联入口与"包含素材"区 */
-  .drawer-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+  .drawer-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
   .drawer-link-btn{
-    padding:9px 16px;border-radius:12px;cursor:pointer;
-    border:1px dashed var(--border);background:transparent;
-    color:var(--accent);font-size:13px;font-family:inherit;letter-spacing:.5px;
-    transition:background .15s,border-color .15s;
+    padding:9px 14px;border-radius:9px;cursor:pointer;
+    border:none;background:var(--fill);
+    color:var(--accent);font-size:15px;font-family:inherit;letter-spacing:0;
+    transition:opacity .15s;
   }
-  .drawer-link-btn:hover{background:var(--accent-soft);border-color:var(--accent);}
-  .drawer-section{margin-top:26px;padding-top:18px;border-top:1px solid var(--border);}
-  .drawer-section-title{font-size:12px;color:var(--text-2);letter-spacing:1px;margin-bottom:12px;}
-  .link-kids{display:flex;flex-direction:column;gap:8px;}
+  .drawer-link-btn:hover{opacity:.75;}
+  .drawer-section{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);}
+  .drawer-section-title{font-size:13px;color:var(--text-2);letter-spacing:0;margin-bottom:10px;}
+  .link-kids{display:flex;flex-direction:column;gap:6px;}
   .link-kid{
-    display:flex;align-items:center;gap:10px;
-    padding:9px 11px;border-radius:12px;
-    background:var(--accent-soft);
-    font-size:13px;color:var(--text);
-    cursor:pointer;transition:transform .12s,box-shadow .15s;   /* V2.0 第二步：可推入 */
+    display:flex;align-items:center;gap:11px;
+    padding:11px 13px;border-radius:9px;
+    background:var(--fill);
+    font-size:15px;color:var(--text);
+    cursor:pointer;transition:opacity .15s;
   }
-  .link-kid:hover{transform:translateX(2px);box-shadow:0 2px 10px rgba(0,0,0,.06);}
-  .link-kid::after{content:'›';flex:0 0 auto;font-size:16px;color:var(--text-2);}
+  .link-kid:hover{opacity:.72;}
+  .link-kid::after{content:'›';flex:0 0 auto;font-size:17px;color:var(--text-2);}
   .drawer-body .link-kid-thumb{
-    width:40px;height:40px;flex:0 0 40px;border-radius:9px;
+    width:38px;height:38px;flex:0 0 38px;border-radius:7px;
     object-fit:cover;margin:0;
   }
   .link-kid-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   /* V2.0 第二步：推入子素材——头部返回按钮 + 内容横向滑入，方向区分前进/后退 */
-  .drawer-back-btn{display:none;width:30px;height:30px;flex:0 0 auto;padding:0;font-size:18px;line-height:1;}
+  .drawer-back-btn{display:none;width:30px;height:30px;flex:0 0 auto;padding:0;font-size:19px;line-height:1;}
   .drawer-back-btn.show{display:inline-flex;align-items:center;justify-content:center;}
   @keyframes drawerSlideIn{from{opacity:0;transform:translateX(26px);}to{opacity:1;transform:none;}}
   @keyframes drawerSlideBack{from{opacity:0;transform:translateX(-26px);}to{opacity:1;transform:none;}}
   .drawer-body.slide-in{animation:drawerSlideIn .26s cubic-bezier(.22,.9,.3,1);}
   .drawer-body.slide-back{animation:drawerSlideBack .26s cubic-bezier(.22,.9,.3,1);}
   .drawer-origin{
-    margin-top:20px;padding:10px 12px;border-radius:10px;
-    background:var(--accent-soft);font-size:12px;line-height:1.6;color:var(--text-2);
+    margin-top:18px;padding:9px 0;
+    font-size:13px;line-height:1.6;color:var(--text-2);
     display:flex;gap:6px;align-items:baseline;
   }
   /* V2.0 第三步：剥离入口——两段式确认，不依赖原生 confirm（内嵌预览会静默屏蔽） */
-  .drawer-unlink{display:flex;gap:10px;margin-top:22px;}
+  .drawer-unlink{display:flex;gap:8px;margin-top:20px;}
   .unlink-btn{
-    padding:9px 16px;border-radius:12px;cursor:pointer;
-    border:1px dashed var(--border);background:transparent;
-    color:var(--text-2);font-size:13px;font-family:inherit;letter-spacing:.5px;
-    transition:background .15s,border-color .15s,color .15s;
+    padding:9px 14px;border-radius:9px;cursor:pointer;
+    border:none;background:var(--fill);
+    color:var(--text);font-size:15px;font-family:inherit;letter-spacing:0;
+    transition:background-color .15s,color .15s;
   }
-  .unlink-btn:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
-  .unlink-btn.arm{background:rgba(214,69,69,.12);border-color:var(--danger);border-style:solid;color:var(--danger);}
+  .unlink-btn:hover{opacity:.75;}
+  .unlink-btn.arm{background:var(--danger);color:#fff;}
 
   /* 手机端：底部抽屉两档——半屏 44vh（背后碎片流可见）/ 全屏 92vh（看长内容） */
   @media (max-width:768px){
@@ -386,22 +444,22 @@
   }
   .modal-mask.open{display:flex;}
   .sync-card{
-    width:100%;max-width:430px;max-height:88vh;max-height:88dvh;overflow-y:auto;
-    background:var(--card);border:1px solid var(--border);border-radius:18px;
-    box-shadow:var(--shadow-hover);padding:24px;
+    width:100%;max-width:420px;max-height:88vh;max-height:88dvh;overflow-y:auto;
+    background:var(--card);border:none;border-radius:14px;
+    padding:22px;
   }
-  .sync-card h3{font-size:16px;font-weight:600;margin-bottom:6px;}
-  .sync-card .hint{font-size:12px;color:var(--text-2);line-height:1.7;margin-bottom:14px;}
-  .sync-card label{display:block;font-size:12px;color:var(--text-2);margin:14px 0 5px;}
+  .sync-card h3{font-size:17px;font-weight:600;margin-bottom:6px;}
+  .sync-card .hint{font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:14px;}
+  .sync-card label{display:block;font-size:13px;color:var(--text-2);margin:14px 0 5px;}
   .sync-card input{
-    width:100%;padding:11px 13px;border-radius:12px;font-size:16px;
-    border:1px solid var(--border);background:var(--bg);color:var(--text);outline:none;
+    width:100%;padding:10px 12px;border-radius:9px;font-size:17px;
+    border:none;background:var(--fill);color:var(--text);outline:none;
   }
-  .sync-card input:focus{border-color:var(--accent);}
-  .sync-link{display:inline-block;margin-top:6px;font-size:12px;color:var(--accent);word-break:break-all;}
+  .sync-card input:focus{box-shadow:0 0 0 3px var(--accent-soft);}
+  .sync-link{display:inline-block;margin-top:6px;font-size:13px;color:var(--accent);word-break:break-all;}
   .sync-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;align-items:center;}
-  .sync-actions .save-btn{margin-left:0;padding:10px 22px;}
-  #syncStatusLine{font-size:12px;color:var(--text-2);margin-top:14px;min-height:18px;line-height:1.6;word-break:break-all;}
+  .sync-actions .save-btn{margin-left:0;padding:9px 18px;}
+  #syncStatusLine{font-size:13px;color:var(--text-2);margin-top:14px;min-height:18px;line-height:1.6;word-break:break-all;}
   #syncStatusLine.err{color:var(--danger);}
   #syncStatusLine.ok{color:#34C759;}
   .sync-status-view{display:none;}
@@ -418,9 +476,9 @@
   .toast{
     position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);
     background:var(--text);color:var(--bg);
-    padding:10px 22px;border-radius:999px;font-size:13px;
+    padding:11px 20px;border-radius:999px;font-size:15px;
     opacity:0;pointer-events:none;transition:all .3s ease;z-index:99;
-    box-shadow:0 8px 30px rgba(0,0,0,.2);max-width:88vw;text-align:center;
+    box-shadow:0 10px 34px rgba(0,0,0,.22);max-width:88vw;text-align:center;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
@@ -431,28 +489,31 @@
        v2.4.1 之前是 rgba(255,255,255,.72) + blur(14px)，滚动时下面的紫色「工作台」Tab、
        卡片删除叉会透出来，看起来像按钮被切了一半（手机真机录屏实证）。
        副作用是好的：华为/鸿蒙机上 backdrop-filter 很吃性能，去掉后滚动更跟手。 */
-    .topbar{padding-left:14px;padding-right:14px;gap:10px;
+    .topbar{padding:8px 14px 8px;gap:8px;
       background:var(--bg);
       -webkit-backdrop-filter:none;backdrop-filter:none;}
-    .logo{font-size:15px;}
+    .logo{font-size:16px;}
+    .logo small{font-size:9px;}
+    .search-box{order:3;flex-basis:100%;max-width:none;padding:6px 9px;}
     .search-box input{font-size:16px;}
-    .search-box{order:3;flex-basis:100%;max-width:none;}
+    /* V2.5：这两个入口在手机上本来就用不了（PWA 安装被华为浏览器接管成桌面书签；
+       备份文件夹授权是 Chromium 桌面的 File System Access API），
+       留着只占一行宽度，把工具栏挤到第二行。 */
+    #installBtn,#backupDirBtn{display:none !important;}
+    .top-actions{gap:0;}
+    .text-btn{padding:6px 8px;font-size:12.5px;}
+    .icon-btn{width:30px;height:30px;font-size:15px;}
     .backup-reminder{display:none;}
     .backup-reminder-mini{display:inline;font-size:11px;color:var(--text-2);margin-left:auto;}
     .backup-reminder-mini.warn{color:var(--danger);font-weight:600;}
     .save-btn{margin-left:0;}
-    /* V2.4.2：Tab 行必须保持一行。原来 flex-wrap:wrap 会让「内核」被挤到第二行，
-       第一行再滚到顶栏下面时只剩半截，视觉上像布局错乱。
-       省空间的三个手段：隐藏英文副标题（纯装饰）、收紧内边距、横向滚动兜底。
-       320px 极窄屏放不下时整行可左右滑，绝不换行。 */
-    .tabs{padding:12px 14px 12px;flex-wrap:nowrap;
-      overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
-    .tabs::-webkit-scrollbar{display:none;}
-    .tab{flex:0 0 auto;padding:8px 14px;font-size:13px;}
-    .tab .tab-sub{display:none;}
-    .god-toggle{font-size:12px;padding:7px 11px;flex:0 0 auto;}
+    /* 分段控件靠等分吃满宽度，不再需要横向滚动兜底 */
+    .tabs{padding:10px 14px 0;flex-wrap:nowrap;}
+    .tab{flex:1 1 0;padding:7px 2px;font-size:13px;}
+    .god-toggle{font-size:12px;padding:7px 8px;flex:0 0 auto;}
     .masonry{padding:0 14px;}
-    .composer{width:calc(100% - 28px);}
+    .composer{width:calc(100% - 28px);padding:12px 16px 10px;}
+    .composer textarea{min-height:58px;}
     body{padding-bottom:calc(40px + env(safe-area-inset-bottom));}
   }
   /* V2.4.2 备注：曾试过在顶栏加「⛶ 全屏」按钮（Fullscreen API），已撤掉。
@@ -470,15 +531,15 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">INSPIRATION<small>灵感收纳盒 · v2.4.2</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
   </div>
   <div class="top-actions">
     <span id="backupReminder" class="backup-reminder"></span>
-    <button id="installBtn" class="text-btn" style="display:none" title="把应用安装到桌面/主屏幕">📲 安装 App</button>
-    <button id="syncBtn" class="text-btn" title="三端云同步（GitHub Gist 加密）">☁ 云同步</button>
+    <button id="installBtn" class="text-btn" style="display:none" title="把应用安装到桌面/主屏幕">安装 App</button>
+    <button id="syncBtn" class="text-btn" title="三端云同步（GitHub Gist 加密）">云同步</button>
     <button id="backupDirBtn" class="text-btn" style="display:none" title="授权后自动备份将静默覆盖写入该文件夹">授权备份文件夹</button>
     <button id="exportBtn" class="text-btn">导出备份</button>
     <button id="importBtn" class="text-btn">导入</button>
@@ -487,9 +548,11 @@
 </header>
 
 <nav class="tabs">
-  <button class="tab" data-space="cold">冷库<span class="tab-sub">Cold</span></button>
-  <button class="tab active" data-space="workspace">工作台<span class="tab-sub">Workspace</span></button>
-  <button class="tab" data-space="core">内核<span class="tab-sub">Core</span></button>
+  <div class="seg">
+    <button class="tab" data-space="cold">冷库</button>
+    <button class="tab active" data-space="workspace">工作台</button>
+    <button class="tab" data-space="core">内核</button>
+  </div>
   <button id="godViewBtn" class="god-toggle" aria-pressed="false" title="把归入父素材的子碎片也平铺到主流，方便一眼看全">⌗ 上帝视角</button>
 </nav>
 
@@ -500,7 +563,7 @@
     <input id="tagInput" class="tag-input" placeholder="输入标签后回车，如：科幻 / 色彩 / 待用">
   </div>
   <div class="composer-tools">
-    <button id="imageBtn" class="icon-btn" title="上传图片" style="width:36px;height:36px;">🖼️</button>
+    <button id="imageBtn" class="text-btn" title="上传图片">图片</button>
     <input id="imageInput" type="file" accept="image/*" hidden>
     <div id="imgPreview" class="img-preview" style="display:none;">
       <img alt="待封存图片">
@@ -521,7 +584,7 @@
   <div class="drawer-grabber" id="drawerGrabber" role="button" aria-label="展开或收起详情"></div>
   <div class="drawer-head">
     <button id="drawerBackBtn" class="icon-btn drawer-back-btn" title="返回上一层" aria-label="返回上一层">‹</button>
-    <span class="drawer-title">碎片详情 · FRAGMENT</span>
+    <span class="drawer-title">碎片详情</span>
     <button id="drawerEditBtn" class="icon-btn drawer-edit-btn" title="编辑这条碎片">编辑</button>
     <button id="drawerSizeBtn" class="icon-btn drawer-size-btn" title="展开/收起" aria-label="展开或收起">˄</button>
     <button id="drawerClose" class="icon-btn" style="width:34px;height:34px;">✕</button>
@@ -633,7 +696,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.4.2';
+const APP_VERSION = '2.5.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -885,11 +948,12 @@ const render = {
       .sort((a,b)=>b.createdAt-a.createdAt);
   },
 
-  // 按瀑布流容器的实际可见宽度分列（抽屉打开让出空间时也会正确降列，V1.4.1）
+  // V2.5：单列。
+  // 瀑布流按"当前最矮的列"分配卡片，阅读顺序会在左右之间跳；
+  // 单列的先后顺序是确定的，而"顺序确定"正是档案感的前提。
+  // 保留函数是因为 cards() / resize 监听都按列数驱动，返回常数 1 即可。
   columnCount(){
-    const box = $('#masonry');
-    const w = (box && box.clientWidth) || window.innerWidth || 1024;
-    return w <= 600 ? 1 : (w <= 1024 ? 2 : 3);
+    return 1;
   },
 
   cards(){
@@ -1051,7 +1115,7 @@ const render = {
       via.className = 'card-via';
       via.title = '这块素材已归入父素材，因搜索命中而显示';
       const icon = document.createElement('span');
-      icon.textContent = '🔗';
+      icon.textContent = '↳';
       const vtxt = document.createElement('span');
       vtxt.className = 'card-via-text';
       vtxt.textContent = `关联自「${pt.length > 14 ? pt.slice(0,14)+'…' : pt}」`;
@@ -1103,7 +1167,7 @@ const render = {
     const backBtn = $('#drawerBackBtn');
     if(backBtn) backBtn.classList.toggle('show', depth > 1);
     const titleEl = $('.drawer-title');
-    if(titleEl) titleEl.textContent = depth > 1 ? '包含素材 · FRAGMENT' : '碎片详情 · FRAGMENT';
+    if(titleEl) titleEl.textContent = depth > 1 ? '包含素材' : '碎片详情';
     const body = $('#drawerBody');
     body.textContent = '';
     if(item.image){
@@ -1130,7 +1194,7 @@ const render = {
 
     const time = document.createElement('div');
     time.className = 'drawer-time';
-    time.textContent = `封存于 ${utils.formatTime(item.createdAt)} · 位于「${SPACE_NAMES[item.space]}」`;
+    time.textContent = `封存于 ${utils.formatTime(item.createdAt)}，在${SPACE_NAMES[item.space]}`;
     body.appendChild(time);
 
     // V2.0：三空间同构——冷库/工作台/内核都能发起关联（父子必在同一空间，渲染层已按 space 隔离）

@@ -56,6 +56,10 @@
   }
 
   *{box-sizing:border-box;margin:0;padding:0;}
+  /* [hidden] 的隐藏来自浏览器默认样式表，任何一条作者写的 display 都能压过它。
+     本文件里 .player / .music-open / .toast-action 都带 display:flex，
+     于是 hidden 属性形同虚设 —— 这里一次性兜住。 */
+  [hidden]{display:none !important;}
   html{scroll-behavior:smooth;}
   body{
     /* 系统字体栈：不引入自定义字体，Windows 落到微软雅黑、鸿蒙落到 HarmonyOS Sans。
@@ -532,6 +536,94 @@
   .install-steps{padding-left:20px;margin:8px 0 12px;}
   .install-steps li{font-size:13px;line-height:1.85;color:var(--text);margin-bottom:7px;}
 
+  /* ---------- V2.6.0：音乐卡 ----------
+     播放条不用原生 <audio controls>：那个控件在不同浏览器里高度从 32px 到 54px，
+     宽屏四栏时每张卡都挂一条灰塑料条，整块版面立刻散架。
+     自己画 30px 一行，深浅主题都能控制。 */
+  .player{display:flex;align-items:center;gap:11px;}
+  .player-btn{
+    flex:none;width:30px;height:30px;border-radius:50%;
+    background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;line-height:1;text-indent:1px;
+    transition:transform .12s ease,opacity .12s ease;
+  }
+  .player-btn:active{transform:scale(.9);}
+  .player-line{flex:1;min-width:0;}
+  .player-track{
+    position:relative;height:3px;border-radius:2px;background:var(--fill);
+    cursor:pointer;
+  }
+  /* 3px 的线手指点不中，上下各撑 9px 的透明热区把它变 21px */
+  .player-track::after{content:'';position:absolute;left:0;right:0;top:-9px;bottom:-9px;}
+  .player-fill{
+    position:absolute;left:0;top:0;bottom:0;border-radius:2px;
+    background:var(--accent);width:0;pointer-events:none;
+  }
+  .player-time{
+    margin-top:5px;font-size:11px;color:var(--text-2);
+    font-variant-numeric:tabular-nums;
+  }
+  /* 抽屉里放大一号：卡片上的 30px 到了半屏抽屉里小得像装饰 */
+  .player-lg .player-btn{width:40px;height:40px;font-size:13px;}
+  .player-lg .player-time{font-size:12px;margin-top:7px;}
+  .player-lg .player-track{height:4px;}
+
+  /* 打不开的音频：多数是音乐平台的分享页而不是直链。
+     不装作能播，直接给一条出口。 */
+  .music-open{
+    display:flex;align-items:center;gap:8px;
+    font-size:13px;color:var(--text-2);line-height:1.5;
+  }
+  .music-open a{color:var(--accent);text-decoration:none;overflow-wrap:anywhere;}
+
+  /* 当时感受：一道 2px 的蓝，跟播放键同色 —— 这张卡上蓝色只表示"声音" */
+  .music-quote{
+    margin-top:12px;padding-left:11px;
+    border-left:2px solid var(--accent);
+    font-size:15px;line-height:1.62;color:var(--text);
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .music-box + .card-content{margin-top:9px;}
+  .music-quote + .card-content{margin-top:7px;}
+  /* 播放键的点击已经 stopPropagation，但整条也要能点开抽屉，别让人误以为整块都是播放区 */
+
+  /* 抽屉里的封面：方形唱片放满 480px 会像图库，居中给个 232px 正好 */
+  .drawer-cover{
+    display:flex;justify-content:center;margin-bottom:18px;
+  }
+  .drawer-cover img{
+    width:100%;max-width:232px;aspect-ratio:1;object-fit:cover;
+    border-radius:12px;display:block;background:var(--fill);
+  }
+  .drawer-player{margin-bottom:16px;}
+  .drawer-body .music-quote{margin-bottom:16px;}
+
+  /* 录入区的音乐卡缩略（跟图片预览同一套位置感） */
+  .music-chip-row{margin-top:9px;}
+  .music-chip{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:4px 6px 4px 4px;border-radius:9px;background:var(--fill);
+    font-size:13px;color:var(--text);max-width:100%;
+  }
+  .music-chip img{width:24px;height:24px;border-radius:6px;object-fit:cover;background:var(--card);}
+  /* min-width:0 必不可少：flex 子项默认 min-width:auto，不写它 ellipsis 永远不触发 */
+  .music-chip .music-chip-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .music-chip button{color:var(--text-2);font-size:15px;line-height:1;padding:0 2px;flex:none;}
+  .music-chip button:hover{color:var(--danger);}
+
+  /* 音乐卡弹窗：字段右侧的「粘贴」贴在输入框里，省一个按钮位 */
+  .music-field{position:relative;}
+  .music-field input{padding-right:56px;}
+  .music-paste{
+    position:absolute;right:5px;top:50%;transform:translateY(-50%);
+    padding:5px 8px;border-radius:6px;font-size:12px;color:var(--accent);
+    background:var(--card);line-height:1.2;
+  }
+  .music-paste:active{opacity:.5;}
+  .music-status{font-size:12px;color:var(--text-2);margin-top:10px;min-height:16px;line-height:1.5;}
+  .music-status.err{color:var(--danger);}
+
   /* ---------- Toast 轻提示 ---------- */
   .toast{
     position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);
@@ -610,7 +702,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.7</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.6.0</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -642,9 +734,18 @@
   <div style="display:flex;align-items:center;gap:8px;">
     <input id="tagInput" class="tag-input" placeholder="输入标签后回车，如：科幻 / 色彩 / 待用">
   </div>
+  <!-- 音乐卡缩略：单独一行。塞进下面那行工具条会把「封存碎片」挤到第二行最左边 -->
+  <div id="musicChipRow" class="music-chip-row" style="display:none;">
+    <span id="musicPreview" class="music-chip">
+      <img alt="">
+      <span class="music-chip-txt"></span>
+      <button id="musicRemoveBtn" title="移除音乐卡">×</button>
+    </span>
+  </div>
   <div class="composer-tools">
     <button id="imageBtn" class="text-btn" title="上传图片">图片</button>
     <input id="imageInput" type="file" accept="image/*" hidden>
+    <button id="musicBtn" class="text-btn" title="记一段声音（音频直链 + 封面 + 当时感受）">音乐</button>
     <div id="imgPreview" class="img-preview" style="display:none;">
       <img alt="待封存图片">
       <button id="imgRemoveBtn" title="移除图片">×</button>
@@ -710,6 +811,35 @@
     </div>
 
     <p id="syncStatusLine"></p>
+  </div>
+</div>
+
+<!-- V2.6.0 音乐卡输入 -->
+<div id="musicModal" class="modal-mask">
+  <div class="sync-card music-card">
+    <h3>♫ 一段声音</h3>
+    <p class="hint">只认音频直链（.mp3 / .m4a / .ogg 这类）。音乐平台的分享页打不开，会退化成一条「在浏览器中打开」的出口，不会假装能播。</p>
+
+    <label>音频直链</label>
+    <div class="music-field">
+      <input id="musicAudioInput" type="url" inputmode="url" autocomplete="off" placeholder="https://…/song.mp3">
+      <button class="music-paste" type="button" data-paste="musicAudioInput">粘贴</button>
+    </div>
+
+    <label>封面图直链（可留空）</label>
+    <div class="music-field">
+      <input id="musicCoverInput" type="url" inputmode="url" autocomplete="off" placeholder="https://…/cover.jpg">
+      <button class="music-paste" type="button" data-paste="musicCoverInput">粘贴</button>
+    </div>
+
+    <label>当时感受（听歌通感）</label>
+    <input id="musicNoteInput" type="text" autocomplete="off" placeholder="像极地干冰的摩擦声">
+
+    <div class="sync-actions">
+      <button id="musicSaveBtn" class="save-btn">记下这段声音</button>
+      <button id="musicCancelBtn" class="text-btn">取消</button>
+    </div>
+    <p id="musicStatus" class="music-status"></p>
   </div>
 </div>
 
@@ -779,7 +909,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.7';
+const APP_VERSION = '2.6.0';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -988,6 +1118,7 @@ const state = {
   search: '',
   theme: 'light',
   pendingImage: null,      // 录入区待封存的图片 Base64
+  pendingMusic: null,      // V2.6.0：录入区待封存的音乐卡 {audioUrl, coverImg, note}
   pendingTags: [],        // 录入区已添加的标签
   drawerId: null,         // 当前抽屉中的碎片 id；null = 关闭
   drawerPath: [],         // V2.0：抽屉内的推入栈，[父id] 或 [父id, 子id, ...]；长度>1 时可逐层返回
@@ -1002,11 +1133,158 @@ const state = {
  * ============================================================ */
 const $ = sel => document.querySelector(sel);
 
+/* ============================================================
+ * V2.6.0：音频引擎
+ * 一条碎片只对应一个 Audio 实例，按 id 缓存。卡片里的播放条和抽屉里的
+ * 播放条指向同一个实例，进度天然同步 —— 不用手写"两边一起更新"。
+ * 全局只允许一条在播：按下新的，旧的自己停（浏览器同时播两首歌是灾难）。
+ * preload 一律 none：一屏可能有几十张音乐卡，不能每张都先去拉一遍音频。
+ * ============================================================ */
+function fmtSec(s){
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+
+const audio = {
+  cache: new Map(),     // itemId -> { el, uis:[], broken }
+  current: null,        // 正在播的那一条 record
+
+  rec(item){
+    let r = this.cache.get(item.id);
+    if(r) return r;
+    const el = new Audio();
+    el.preload = 'none';
+    el.src = item.audioUrl;
+    r = { el, uis: [], broken: false };
+    el.addEventListener('timeupdate', ()=>this.paint(r));
+    el.addEventListener('loadedmetadata', ()=>this.paint(r));
+    el.addEventListener('play', ()=>{ this._pauseOthers(r); this.paint(r); });
+    el.addEventListener('pause', ()=>this.paint(r));
+    el.addEventListener('ended', ()=>{ el.currentTime = 0; this.paint(r); });
+    el.addEventListener('error', ()=>{ r.broken = true; this.paint(r); });
+    this.cache.set(item.id, r);
+    return r;
+  },
+
+  // 每次重建卡片，旧播放条节点全成了孤儿，先把登记表清掉
+  resetUIs(){ this.cache.forEach(r=>{ r.uis = []; }); },
+
+  paint(r){ for(let i=0;i<r.uis.length;i++) this._paintOne(r, r.uis[i]); },
+
+  _paintOne(r, ui){
+    const el = r.el;
+    ui.shell.classList.toggle('broken', r.broken);
+    if(r.broken){
+      ui.player.hidden = true;
+      ui.err.hidden = false;
+      return;
+    }
+    ui.player.hidden = false;
+    ui.err.hidden = true;
+    // 判"在播"只能看 paused。不能用 currentTime>0：有的环境（无音频设备、
+    // 后台标签页节流）play() 成功但时间不走，那样按钮会一直显示 ▶，看着像没点动。
+    const playing = !el.paused;
+    ui.btn.textContent = playing ? '❚❚' : '▶';
+    ui.btn.title = playing ? '暂停' : '播放';
+    const d = el.duration;
+    const ok = isFinite(d) && d > 0;
+    ui.fill.style.width = ok ? Math.min(100, el.currentTime/d*100).toFixed(2)+'%' : '0%';
+    ui.time.textContent = fmtSec(el.currentTime) + ' / ' + (ok ? fmtSec(d) : '--:--');
+  },
+
+  toggle(r){
+    if(r.broken) return;
+    if(r.el.paused){
+      const p = r.el.play();
+      if(p && p.catch) p.catch(err=>{
+        if(err && err.name === 'NotAllowedError') return;   // 浏览器拦了自动播放，再点一次就好
+        r.broken = true; this.paint(r);
+      });
+    }else{
+      r.el.pause();
+    }
+  },
+
+  seek(r, ev){
+    const d = r.el.duration;
+    if(!isFinite(d) || d <= 0) return;
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+    r.el.currentTime = ratio * d;
+    this.paint(r);
+  },
+
+  _pauseOthers(r){
+    if(this.current && this.current !== r) this.current.el.pause();
+    this.current = r;
+  },
+
+  // 碎片被删掉时顺手掐掉正在播的声音，否则列表空了还在唱
+  stopIf(id){
+    const r = this.cache.get(id);
+    if(r){ r.el.pause(); this.cache.delete(id); }
+    if(this.current && this.current === r) this.current = null;
+  },
+
+  // 音乐卡播放条。cover 会渲染在它上面，两者共用一套间距
+  build(item, large){
+    const shell = document.createElement('div');
+    shell.className = 'music-box' + (large ? ' music-box-lg' : '');
+    const player = document.createElement('div');
+    player.className = 'player' + (large ? ' player-lg' : '');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'player-btn';
+    btn.textContent = '▶';
+    btn.title = '播放';
+    const line = document.createElement('div');
+    line.className = 'player-line';
+    const track = document.createElement('div');
+    track.className = 'player-track';
+    const fill = document.createElement('div');
+    fill.className = 'player-fill';
+    track.appendChild(fill);
+    const time = document.createElement('div');
+    time.className = 'player-time';
+    time.textContent = '0:00 / --:--';
+    line.appendChild(track);
+    line.appendChild(time);
+    player.appendChild(btn);
+    player.appendChild(line);
+
+    const err = document.createElement('div');
+    err.className = 'music-open';
+    err.hidden = true;
+    const mark = document.createElement('span');
+    mark.textContent = '⚠';
+    const a = document.createElement('a');
+    a.href = item.audioUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = '这段音频打不开，在浏览器中打开试试';
+    err.appendChild(mark);
+    err.appendChild(a);
+
+    shell.appendChild(player);
+    shell.appendChild(err);
+
+    const r = this.rec(item);
+    const ui = { shell, player, err, btn, fill, time };
+    r.uis.push(ui);
+    btn.addEventListener('click', e=>{ e.stopPropagation(); this.toggle(r); });   // 别顺带把抽屉点开
+    track.addEventListener('click', e=>{ e.stopPropagation(); this.seek(r, e); });
+    this._paintOne(r, ui);
+    return shell;
+  }
+};
+
+
 const render = {
   // 总入口：数据/状态变化后调用
   all(){
     this.cards();
     this.backupReminder();
+    this.musicPreview();
     this.saveButton();
   },
 
@@ -1021,7 +1299,9 @@ const render = {
     const hit = x => {
       if(!kw) return true;
       if(tagOnly) return tagsOf(x).some(t=>t.toLowerCase().includes(tagKw));
+      // V2.6.0：音乐卡的"当时感受"也算正文，否则搜「干冰」找不到那张卡
       return (x.content||'').toLowerCase().includes(kw)
+        || (x.comments||'').toLowerCase().includes(kw)
         || tagsOf(x).some(t=>t.toLowerCase().includes(kw));
     };
     const alive = new Set(state.items.map(x=>x.id));
@@ -1058,6 +1338,7 @@ const render = {
   cards(){
     const box = $('#masonry');
     box.textContent = '';
+    audio.resetUIs();   // V2.6.0：旧卡片连同播放条一起没了，登记表必须跟着清
     const list = this.visibleItems();
     const byId = new Map(state.items.map(x=>[x.id,x]));   // V2.0 第四步：查父素材，用于标注来源
     if(!list.length){
@@ -1228,6 +1509,23 @@ const render = {
       card.appendChild(wrap);
     }
 
+    // V2.6.0：音乐卡的封面。唱片封面是方的，固定 1:1，不跟随原图比例——
+    // 一张 16:9 的横幅封面会把卡片撑成广告位。
+    if(item.coverImg){
+      const wrap = document.createElement('div');
+      wrap.className = 'card-img-wrap';
+      wrap.style.aspectRatio = '1';
+      const img = document.createElement('img');
+      img.className = 'card-img cover';
+      img.src = item.coverImg;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.addEventListener('error', ()=>wrap.remove(), {once:true});   // 外链挂了就整块撤掉
+      wrap.appendChild(img);
+      card.appendChild(wrap);
+    }
+
     const body = document.createElement('div');
     body.className = 'card-body';
 
@@ -1236,7 +1534,7 @@ const render = {
     const showingFolded = !!(state.search.trim() || state.godView);
     const viaParent = (showingFolded && item.parentId && byId && byId.get(item.parentId)) || null;
     if(viaParent){
-      const pt = (viaParent.content||'').trim() || (viaParent.image ? '（图片碎片）' : '（空碎片）');
+      const pt = (viaParent.content||'').trim() || (viaParent.image ? '（图片碎片）' : viaParent.audioUrl ? '（音乐卡）' : '（空碎片）');
       const via = document.createElement('div');
       via.className = 'card-via';
       via.title = '这块素材已归入父素材，因搜索命中而显示';
@@ -1248,6 +1546,18 @@ const render = {
       via.appendChild(icon);
       via.appendChild(vtxt);
       body.appendChild(via);
+    }
+
+    // V2.6.0：音乐卡。播放条在最上面（贴着封面），然后才是感受和随想。
+    if(item.audioUrl) body.appendChild(audio.build(item, false));
+
+    // 当时感受。单独拎出来加一道蓝线，是因为它和随想不是一回事：
+    // 一句是听到时身体里的反应，一句是事后想说的。
+    if(item.comments && item.comments.trim()){
+      const q = document.createElement('div');
+      q.className = 'music-quote';
+      q.textContent = item.comments.trim();
+      body.appendChild(q);
     }
 
     const content = document.createElement('div');
@@ -1335,6 +1645,29 @@ const render = {
       img.src = item.image; img.alt='';
       body.appendChild(img);
     }
+    // V2.6.0：音乐卡。封面居中给 232px —— 方形唱片放满 480px 的抽屉会像图库。
+    if(item.coverImg && !item.image){
+      const box = document.createElement('div');
+      box.className = 'drawer-cover';
+      const img = document.createElement('img');
+      img.src = item.coverImg;
+      img.alt = '';
+      img.decoding = 'async';
+      img.addEventListener('error', ()=>box.remove(), {once:true});
+      box.appendChild(img);
+      body.appendChild(box);
+    }
+    if(item.audioUrl){
+      const shell = audio.build(item, true);
+      shell.classList.add('drawer-player');
+      body.appendChild(shell);
+    }
+    if(item.comments && item.comments.trim()){
+      const q = document.createElement('div');
+      q.className = 'music-quote';
+      q.textContent = item.comments.trim();
+      body.appendChild(q);
+    }
     const content = document.createElement('div');
     content.className = 'drawer-content';
     content.appendChild(this.linkedText(item.content));
@@ -1405,7 +1738,7 @@ const render = {
         }
         const txt = document.createElement('div');
         txt.className = 'link-kid-text';
-        const preview = (k.content||'').trim() || (k.image ? '（图片碎片）' : '（空碎片）');
+        const preview = (k.content||'').trim() || (k.image ? '（图片碎片）' : k.audioUrl ? '（音乐卡）' : '（空碎片）');
         txt.textContent = preview.length > 60 ? preview.slice(0,60) + '…' : preview;
         row.appendChild(txt);
         list.appendChild(row);
@@ -1424,7 +1757,7 @@ const render = {
         const label = document.createElement('span');
         label.textContent = '↩ 属于：';
         const pv = document.createElement('span');
-        const t = (p.content||'').trim() || (p.image ? '（图片碎片）' : '（空碎片）');
+        const t = (p.content||'').trim() || (p.image ? '（图片碎片）' : p.audioUrl ? '（音乐卡）' : '（空碎片）');
         pv.textContent = t.length > 24 ? t.slice(0,24)+'…' : t;
         origin.appendChild(label);
         origin.appendChild(pv);
@@ -1528,7 +1861,12 @@ const render = {
     $('#contentInput').value = item.content || '';
     state.pendingTags = Array.isArray(item.tags) ? item.tags.slice() : [];
     state.pendingImage = item.image ? { src:item.image, w:item.imageW||null, h:item.imageH||null } : null;
-    this.tagChips(); this.imagePreview(); this.saveButton();
+    // V2.6.0：音乐卡也灌回录入区。编一条音乐卡时人要能看到自己写的感受，
+    // 而不是对着一个空的输入框猜"原来那句哪去了"。
+    state.pendingMusic = item.audioUrl
+      ? { audioUrl:item.audioUrl, coverImg:item.coverImg||null, note:item.comments||'' }
+      : null;
+    this.tagChips(); this.imagePreview(); this.musicPreview(); this.saveButton();
     $('#saveBtn').textContent = '保存修改';
     $('#cancelEditBtn').style.display = '';
     const input = $('#contentInput');
@@ -1543,7 +1881,8 @@ const render = {
     $('#contentInput').value = '';
     state.pendingTags = [];
     state.pendingImage = null;
-    this.tagChips(); this.imagePreview(); this.saveButton();
+    state.pendingMusic = null;
+    this.tagChips(); this.imagePreview(); this.musicPreview(); this.saveButton();
     $('#saveBtn').textContent = '封存碎片';
     $('#cancelEditBtn').style.display = 'none';
   },
@@ -1819,8 +2158,30 @@ const render = {
     }
   },
 
+  // V2.6.0：录入区的音乐卡缩略。跟图片预览同一个位置，用户不用学两套习惯。
+  musicPreview(){
+    const row = $('#musicChipRow');
+    const chip = $('#musicPreview');
+    const img = chip.querySelector('img');
+    const pm = state.pendingMusic;
+    if(!pm){
+      row.style.display = 'none';
+      img.removeAttribute('src');
+      return;
+    }
+    row.style.display = '';
+    if(pm.coverImg){
+      img.style.display = '';
+      img.onerror = ()=>{ img.style.display = 'none'; };   // 外链挂了就只显示文字
+      img.src = pm.coverImg;
+    }else{
+      img.style.display = 'none';
+    }
+    chip.querySelector('.music-chip-txt').textContent = (pm.note||'').trim() || '音乐卡';
+  },
+
   saveButton(){
-    const hasContent = $('#contentInput').value.trim().length>0 || !!state.pendingImage;
+    const hasContent = $('#contentInput').value.trim().length>0 || !!state.pendingImage || !!state.pendingMusic;
     $('#saveBtn').disabled = !hasContent;
   },
 
@@ -2553,6 +2914,37 @@ function syncModalStatus(text, isErr=false, isOk=false){
   el.classList.toggle('err', !!isErr);
   el.classList.toggle('ok', !!isOk);
 }
+
+/* ---------- V2.6.0：音乐卡弹窗 ----------
+   弹窗只负责把三个字段收进口袋（state.pendingMusic），不直接落库。
+   因为标签和空间还在录入区里选，抢着保存会存出一张没有标签的音乐卡。 */
+function musicModalStatus(text, isErr){
+  const el = $('#musicStatus');
+  if(!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('err', !!isErr);
+}
+function openMusicModal(){
+  const pm = state.pendingMusic || {};
+  $('#musicAudioInput').value = pm.audioUrl || '';
+  $('#musicCoverInput').value = pm.coverImg || '';
+  $('#musicNoteInput').value  = pm.note || '';
+  musicModalStatus('');
+  $('#musicModal').classList.add('open');
+}
+function closeMusicModal(){ $('#musicModal').classList.remove('open'); }
+function saveMusicToComposer(){
+  const audioUrl = $('#musicAudioInput').value.trim();
+  const coverImg = $('#musicCoverInput').value.trim();
+  const note = $('#musicNoteInput').value.trim();
+  if(!audioUrl){ musicModalStatus('至少要有一条音频直链', true); return; }
+  if(!/^https?:\/\//i.test(audioUrl)){ musicModalStatus('音频直链要以 http(s):// 开头', true); return; }
+  if(coverImg && !/^https?:\/\//i.test(coverImg)){ musicModalStatus('封面直链要以 http(s):// 开头', true); return; }
+  state.pendingMusic = { audioUrl, coverImg: coverImg || null, note };
+  render.musicPreview(); render.saveButton();
+  closeMusicModal();
+  toast('音乐卡已就绪，点封存碎片');
+}
 async function renderSyncUI(){
   const last = await db.getSetting('lastSyncAt');
   const lastLine = $('#syncLastLine');
@@ -2569,20 +2961,28 @@ function bindEvents(){
   // —— 封存碎片 ——
   $('#saveBtn').addEventListener('click', async ()=>{
     const content = $('#contentInput').value.trim();
-    if(!content && !state.pendingImage) return;
+    if(!content && !state.pendingImage && !state.pendingMusic) return;
 
     // V1.5：编辑态保存——只改内容/标签/图片，updatedAt 走 LWW 同步
     if(state.editingId){
       const old = state.items.find(x=>x.id===state.editingId);
       if(!old){ render.cancelEdit(); return; }
+      // V2.6.0：音乐字段跟着录音区走。移除音乐卡时把三个字段一起清空，
+      // 否则会留下一条"有封面有声有感受、但已经不是音乐卡"的怪记录。
+      const pm = state.pendingMusic;
       const next = {
         ...old,
-        type: state.pendingImage ? 'image' : (old.type==='image' ? 'text' : old.type),
+        type: pm ? 'music'
+          : state.pendingImage ? 'image'
+          : (old.type==='image' || old.type==='music' ? 'text' : old.type),
         content,
         tags: [...new Set(state.pendingTags)],
         image: state.pendingImage ? state.pendingImage.src : null,
         imageW: state.pendingImage ? state.pendingImage.w : null,
         imageH: state.pendingImage ? state.pendingImage.h : null,
+        audioUrl: pm ? pm.audioUrl : null,
+        coverImg: pm ? pm.coverImg : null,
+        comments: pm ? pm.note : '',
         updatedAt: Date.now()
       };
       try{
@@ -2601,19 +3001,20 @@ function bindEvents(){
       return;
     }
 
+    const pm = state.pendingMusic;
     const item = {
       id: utils.uid(),
       space: state.currentSpace,
-      type: state.pendingImage ? 'image' : 'text',
+      type: pm ? 'music' : (state.pendingImage ? 'image' : 'text'),
       content,
       tags: [...new Set(state.pendingTags)],
       image: state.pendingImage ? state.pendingImage.src : null,
       imageW: state.pendingImage ? state.pendingImage.w : null,  // 图片原始尺寸（瀑布流占位用）
       imageH: state.pendingImage ? state.pendingImage.h : null,
       parentId: null,          // V2.0 关联功能预留
-      audioUrl: null,          // V2.1 音乐卡预留
-      coverImg: null,
-      comments: '',
+      audioUrl: pm ? pm.audioUrl : null,   // V2.6.0 音乐卡
+      coverImg: pm ? pm.coverImg : null,
+      comments: pm ? pm.note : '',
       createdAt: Date.now(),
       updatedAt: Date.now()    // 云同步按此字段做"最后修改胜出"
     };
@@ -2622,8 +3023,8 @@ function bindEvents(){
       state.items.push(item);
       // 清空录入区
       $('#contentInput').value='';
-      state.pendingTags=[]; state.pendingImage=null;
-      render.tagChips(); render.imagePreview(); render.saveButton();
+      state.pendingTags=[]; state.pendingImage=null; state.pendingMusic=null;
+      render.tagChips(); render.imagePreview(); render.musicPreview(); render.saveButton();
       render.all();
       const mode = await backup.run(false);
       const msgMap = {
@@ -2674,6 +3075,31 @@ function bindEvents(){
   });
   $('#imgRemoveBtn').addEventListener('click', ()=>{
     state.pendingImage=null; render.imagePreview(); render.saveButton();
+  });
+
+  /* ---------- V2.6.0：音乐卡 ---------- */
+  $('#musicBtn').addEventListener('click', ()=>openMusicModal());
+  $('#musicSaveBtn').addEventListener('click', ()=>saveMusicToComposer());
+  $('#musicCancelBtn').addEventListener('click', ()=>closeMusicModal());
+  $('#musicModal').addEventListener('click', e=>{ if(e.target.id==='musicModal') closeMusicModal(); });
+  $('#musicRemoveBtn').addEventListener('click', ()=>{
+    state.pendingMusic = null; render.musicPreview(); render.saveButton();
+  });
+  // 两个字段各有自己的「粘贴」：比猜"你刚才点的是哪个框"可靠
+  document.querySelectorAll('.music-paste').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const input = $('#'+btn.dataset.paste);
+      try{
+        const txt = (await navigator.clipboard.readText() || '').trim();
+        if(!txt){ musicModalStatus('剪贴板是空的'); return; }
+        if(!/^https?:\/\//i.test(txt)){ musicModalStatus('剪贴板里不是链接', true); return; }
+        input.value = txt;
+        musicModalStatus('');
+      }catch(err){
+        // file:// 或没给权限时 readText 会直接抛，不能让它静默失败
+        musicModalStatus('浏览器不允许读剪贴板，请长按输入框手动粘贴', true);
+      }
+    });
   });
 
   // —— 粘贴图片 ——
@@ -2767,6 +3193,7 @@ function bindEvents(){
     }
     await db.deleteItem(id);
     await cloudSync.tombstone(id); // 记墓碑并触发云同步（未开启同步时无副作用）
+    audio.stopIf(id);              // V2.6.0：删掉的音乐卡不能还在后台唱
     state.items = state.items.filter(x=>x.id!==id);
     render.all();
     backup.run(false);
@@ -2925,6 +3352,8 @@ function bindEvents(){
   $('#linkCancelBtn').addEventListener('click', ()=>render.exitLink());
   document.addEventListener('keydown', (e)=>{
     if(e.key !== 'Escape') return;
+    // V2.6.0：弹窗开着时 Esc 先关弹窗，别一按把背后的抽屉也带走了
+    if($('#musicModal').classList.contains('open')){ closeMusicModal(); return; }
     if(state.linkingParentId){ render.exitLink(); return; }  // 先退关联模式，再关抽屉
     if(state.drawerPath.length > 1){ render.drawerBack(); return; }  // V2.0 第二步：Esc 先逐层返回
     render.closeDrawer();

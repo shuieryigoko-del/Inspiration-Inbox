@@ -86,7 +86,7 @@
   .topbar{
     position:sticky;top:0;z-index:40;
     display:flex;align-items:center;gap:12px;
-    padding:calc(10px + env(safe-area-inset-top)) 20px 10px;
+    padding:calc(10px + env(safe-area-inset-top)) max(20px, calc(50% - 540px)) 10px;
     background:var(--glass);
     -webkit-backdrop-filter:blur(20px) saturate(1.8);
     backdrop-filter:blur(20px) saturate(1.8);
@@ -131,7 +131,7 @@
      页面上因此少掉两个按钮的视觉重量。 */
   .tabs{
     display:flex;align-items:center;gap:10px;
-    padding:14px 20px 0;max-width:720px;margin:0 auto;width:100%;
+    padding:14px 20px 0;max-width:1120px;margin:0 auto;width:100%;
   }
   .seg{
     display:flex;gap:2px;padding:2px;flex:1;min-width:0;
@@ -161,17 +161,27 @@
   }
   .god-toggle:hover{color:var(--text);}
   .god-toggle.on{background:var(--accent);color:#fff;}
+  /* V2.5.2：宽屏下分段控件不跟着列表一起拉满。
+     三个词各占 360px 时，中间的空隙比词本身还宽，看起来像三个不相关的按钮，
+     而不是"一个控件里的三个选项"。限宽后它退回工具栏的尺度。 */
+  @media(min-width:769px){
+    .seg{flex:0 1 400px;max-width:400px;}
+  }
 
   /* ---------- 录入区 ---------- */
   /* 宽度对齐到"卡片本体"，不是对齐到列容器 —— 否则白色块的边缘会比列表多出 20px */
   .composer{
-    max-width:680px;margin:12px auto 8px;width:calc(100% - 40px);
+    max-width:1080px;margin:12px auto 8px;width:calc(100% - 40px);
     background:var(--card);border:none;border-radius:var(--r-card);
     padding:12px 16px 10px;
   }
   .composer textarea{
     width:100%;min-height:52px;border:none;outline:none;resize:vertical;
     background:transparent;font-size:17px;line-height:1.5;
+  }
+  /* 输入框跟列表同宽（1080）时，52px 高看起来像一条极扁的横条，加高才立得住 */
+  @media(min-width:769px){
+    .composer textarea{min-height:76px;}
   }
   .tag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;}
   .tag-chip{
@@ -199,15 +209,16 @@
   .save-btn:hover{opacity:.88;}
   .save-btn:disabled{opacity:.36;cursor:not-allowed;}
 
-  /* ---------- 列表：单列 ---------- */
-  /* V2.5：原来是 1–3 列瀑布流。改成单列后，每条碎片的阅读顺序是确定的，
-     且同一屏能读到的字数变少 —— 这正是"被认真看过"的感觉来源。
-     桌面端不拉满，720px 居中，接近一份文档的栏宽。 */
+  /* ---------- 列表：多栏 ---------- */
+  /* V2.5：单列。V2.5.2 起改回多栏，但不是 V2.4.2 那种"一堆各自悬浮的卡片流"——
+     宽屏下是几栏连续的白色面并排，像一份分栏排版的文档。
+     区别在于：卡片之间仍然只靠 1px 分隔线断开，没有投影、没有圆角缝隙，
+     所以一屏能看见十几条，却不显得碎。 */
   .masonry{
-    max-width:720px;margin:0 auto;width:100%;padding:0 20px;
-    display:flex;flex-direction:column;align-items:stretch;gap:0;
+    max-width:1120px;margin:0 auto;width:100%;padding:0 20px;
+    display:flex;flex-direction:row;align-items:flex-start;gap:20px;
   }
-  .masonry-col{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .masonry-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;}
   /* V2.5.1：每张卡片外面套一层左滑容器。手机上原来靠卡片右上角常驻的 ✕ 删除，
      那是网页的做法；原生列表把操作藏在左滑后面——静止时只有内容，没有控件。
      桌面端仍然保留 hover 才出现的 ✕（见 .card-del）。 */
@@ -353,20 +364,13 @@
     z-index:50;display:flex;flex-direction:column;
   }
   .drawer.open{transform:translateX(0);}
-  /* V2.5：抽屉打开时不再压缩列表宽度，而是把整列平移让出位置。
-     用 transform 而不是 padding 的原因：transform 不改变布局宽度，
-     卡片不会因为"可用宽度变窄"而重新折行——文字位置整体左移，读起来是连续的。
-     只在会真的重叠的宽度区间做（>1400px 时 720+480 放得下，不需要让）。 */
-  @media(min-width:769px) and (max-width:1400px){
-    .tabs,.composer,.masonry{
-      transition:transform .32s cubic-bezier(.22,.9,.3,1);
-    }
-    body.drawer-open .tabs,
-    body.drawer-open .composer,
-    body.drawer-open .masonry{
-      /* 只用乘法：calc 里除以负数在部分 Chromium 上会被整条丢弃 */
-      transform:translateX(calc((var(--drawer-w) + 14px) * -0.5));
-    }
+  /* V2.5.2：抽屉打开时给 body 加右侧内边距，整页（含顶栏）一起让出抽屉的宽度。
+     比原来逐个元素加 transform 简单：一次声明同时管住顶栏对齐、输入区宽度和列表列数。
+     而且让位是真的改变布局宽度——3 栏会变成 2 栏，不会出现"最后一栏被抽屉压住一半"。
+     手机端抽屉是底部半屏，不需要让位，所以限定 min-width:769px。 */
+  @media(min-width:769px){
+    body{transition:padding-right .32s cubic-bezier(.22,.9,.3,1);}
+    body.drawer-open{padding-right:var(--drawer-w);}
   }
   @media(min-width:769px){
     /* V2.0：关联确认条居中于抽屉之外的可视区，不与抽屉重叠 */
@@ -555,7 +559,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.1</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.2</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -720,7 +724,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.1';
+const APP_VERSION = '2.5.2';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -972,11 +976,17 @@ const render = {
       .sort((a,b)=>b.createdAt-a.createdAt);
   },
 
-  // V2.5：单列。
-  // 瀑布流按"当前最矮的列"分配卡片，阅读顺序会在左右之间跳；
-  // 单列的先后顺序是确定的，而"顺序确定"正是档案感的前提。
-  // 保留函数是因为 cards() / resize 监听都按列数驱动，返回常数 1 即可。
+  // V2.5.2：宽屏多栏。
+  // 按"可用内容宽度"决定栏数，不是按窗口宽度——抽屉让位、滚动条都会改变真实可用宽度。
+  // 一栏低于 320px 时，17px 的字一行只放得下十来个，读起来会断气，所以 3 栏要求 1000。
   columnCount(){
+    const box = $('#masonry');
+    if(!box) return 1;
+    const cs = getComputedStyle(box);
+    const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const inner = box.clientWidth - pad;
+    if(inner >= 1000) return 3;
+    if(inner >= 620) return 2;
     return 1;
   },
 
@@ -1025,7 +1035,9 @@ const render = {
     ro.observe($('#masonry'));
   },
   _maybeRebuildColumns(){
-    if(state.drawerId) return; // 抽屉开关过程中不重建，关闭后再统一恢复（避免动画中双重跳动）
+    // V2.5.2：抽屉打开时也要重建——桌面端抽屉让位会真的改变可用宽度和列数。
+    // body 的 padding-right 有 320ms 过渡，过渡中 columnCount() 会连续变化，
+    // 但只在"列数跨过断点"时重建，最多各一次。
     const n = this.columnCount();
     if(n !== state._cols) this.cards();
   },
@@ -1326,6 +1338,17 @@ const render = {
     }
   },
 
+  // V2.5.2：抽屉开关会让位，可用宽度变了，列数可能跨断点。
+  // 不能只靠 ResizeObserver——body 的 padding-right 有 320ms 过渡，
+  // 过渡期间宽度是连续变化的，等它落定再量一次最稳（列数没变则什么都不做）。
+  _queueColSync(){
+    clearTimeout(this._colTimer);
+    this._colTimer = setTimeout(()=>{
+      const n = this.columnCount();
+      if(n !== state._cols) this.cards();
+    }, 360);
+  },
+
   openDrawer(id){
     this.exitLink();   // V2.0：打开别的卡片前先退出关联模式，避免勾选态悬空
     const item = state.items.find(x=>x.id===id);
@@ -1345,6 +1368,7 @@ const render = {
     $('#drawer').classList.add('open');
     $('#scrim').classList.add('open');
     document.body.classList.add('drawer-open'); // 背景让出抽屉空间（V1.4.1）
+    this._queueColSync();
     $('#drawer').setAttribute('aria-hidden','false');
     $('#drawerEditBtn').style.display = '';
   },
@@ -1359,6 +1383,7 @@ const render = {
     $('#scrim').classList.remove('open');
     document.body.classList.remove('drawer-open');
     document.body.classList.remove('drawer-full');
+    this._queueColSync();
     $('#drawer').setAttribute('aria-hidden','true');
     $('#drawerEditBtn').style.display = 'none';
     state.drawerId = null;
@@ -1414,6 +1439,7 @@ const render = {
     $('#drawer').classList.remove('open');
     $('#scrim').classList.remove('open');
     document.body.classList.remove('drawer-open');
+    this._queueColSync();
     document.body.classList.remove('drawer-full');
     $('#drawer').setAttribute('aria-hidden','true');
   },

@@ -34,6 +34,10 @@ app/_measure.html
 app/_exp_*.html
 app/_move.html
 app/_dtscroll.html
+app/_move.html
+app/_undo.html
+app/_toast.html
+app/_stk.html
 # 外部参考资料与设计探索稿
 .tmp_refs/
 .tmp_frames/

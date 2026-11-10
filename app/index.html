@@ -521,9 +521,28 @@
     background:var(--text);color:var(--bg);
     padding:11px 20px;border-radius:999px;font-size:15px;
     opacity:0;pointer-events:none;transition:all .3s ease;z-index:99;
-    box-shadow:0 10px 34px rgba(0,0,0,.22);max-width:88vw;text-align:center;
+    box-shadow:0 10px 34px rgba(0,0,0,.22);max-width:calc(100vw - 32px);text-align:center;
+    display:flex;align-items:center;justify-content:center;gap:16px;
+    /* 提示条永远单行：一旦折行，胶囊变成方块、按钮在右边悬着，很难看 */
+    white-space:nowrap;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  /* 撤销按钮：与提示条同色，只靠竖线和字重区分。
+     用 currentColor 而不是 accent——toast 的底色是 --text、字色是 --bg，
+     两个变量在深浅主题下正好互换，只有跟着 currentColor 才在任何主题下都够对比。 */
+  .toast-action{
+    flex:0 0 auto;border:none;background:none;cursor:pointer;
+    position:relative;padding:2px 0 2px 17px;margin:-2px 0;
+    font:inherit;font-weight:700;letter-spacing:.02em;
+    color:inherit;
+  }
+  /* 竖线画在 gap 正中、比字矮一截：满高的竖线会被读成一个表格边框 */
+  .toast-action::before{
+    content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:1px;height:15px;background:currentColor;opacity:.5;
+  }
+  .toast-action[hidden]{display:none;}
+  .toast-action:active{opacity:.55;}
 
   .backup-reminder-mini{display:none;}
   /* 手机端细节：窄屏下顶栏自动换行不溢出；底部留出手势条安全区 */
@@ -574,7 +593,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.4</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.5</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
@@ -718,7 +737,10 @@
   </div>
 </div>
 
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast" role="status" aria-live="polite">
+  <span id="toastMsg"></span>
+  <button id="toastAction" class="toast-action" type="button" hidden></button>
+</div>
 <input id="importInput" type="file" accept=".json,application/json" hidden>
 
 <script>
@@ -739,7 +761,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.4';
+const APP_VERSION = '2.5.5';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -2286,6 +2308,16 @@ const cloudSync = {
     this.schedule();
   },
 
+  // 撤销删除：把墓碑摘掉，否则下一次合并时服务端仍认为这条已死，
+  // 会把刚恢复的记录再删一次（合并规则是墓碑优先）
+  async unTombstone(id){
+    const tombs = (await db.getSetting('tombstones')) || [];
+    const next = tombs.filter(t=>t.id !== id);
+    if(next.length === tombs.length) return;
+    await db.setSetting('tombstones', next);
+    this.schedule();
+  },
+
   // 防抖自动同步（封存/删除/导入后）
   schedule(delay=5000){
     clearTimeout(this._timer);
@@ -2382,29 +2414,66 @@ window.cloudSync = cloudSync; // 便于控制台排错，同源页面本身即�
  * 第 5 层：事件监听层（用户操作 → 改数据 → 更新状态 → 重绘）
  * ============================================================ */
 let toastTimer;
-function toast(msg){
+let toastBtnHandler = null;
+let toastElHandler = null;
+
+// 每次显示前清掉上一轮的点击处理，否则「撤销」的旧闭包会被新提示条继承
+function _clearToastHandlers(){
+  const el = $('#toast'), btn = $('#toastAction');
+  if(toastBtnHandler){ btn.removeEventListener('click', toastBtnHandler); toastBtnHandler = null; }
+  if(toastElHandler){ el.removeEventListener('click', toastElHandler); toastElHandler = null; }
+}
+function _hideToast(){
+  clearTimeout(toastTimer);
   const el = $('#toast');
-  el.textContent = msg;
+  el.classList.remove('show');
+  _clearToastHandlers();
+  $('#toastAction').hidden = true;
   el.style.pointerEvents = 'none';
   el.style.cursor = 'default';
+}
+
+function toast(msg){
+  _hideToast();
+  $('#toastMsg').textContent = msg;
+  const el = $('#toast');
   el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>el.classList.remove('show'), 2600);
+  toastTimer = setTimeout(_hideToast, 2600);
+}
+
+// 带一个操作按钮的提示条（删除后的「撤销」走这里）。
+// ms 既决定按钮存在多久，也决定 onAction 之后还能不能点——超时即作废。
+function toastAction(msg, actionText, onAction, ms=6000){
+  _hideToast();
+  const el = $('#toast'), btn = $('#toastAction');
+  $('#toastMsg').textContent = msg;
+  btn.textContent = actionText;
+  btn.hidden = false;
+  el.style.pointerEvents = 'auto';
+  el.classList.add('show');
+  toastBtnHandler = (e)=>{
+    e.stopPropagation();
+    _hideToast();
+    onAction();
+  };
+  btn.addEventListener('click', toastBtnHandler);
+  toastTimer = setTimeout(_hideToast, ms);
 }
 
 // 版本更新提示：常驻、可点击，点击后立即接管新版并刷新
 function showUpdateToast(onClick){
+  _hideToast();
   const el = $('#toast');
-  el.textContent = '🔄 发现新版本，点此立即更新';
+  $('#toastMsg').textContent = '🔄 发现新版本，点此立即更新';
   el.style.pointerEvents = 'auto';
   el.style.cursor = 'pointer';
   el.classList.add('show');
-  clearTimeout(toastTimer);
-  const handler = ()=>{
-    el.removeEventListener('click', handler);
+  toastElHandler = ()=>{
+    el.removeEventListener('click', toastElHandler);
+    toastElHandler = null;
     onClick();
   };
-  el.addEventListener('click', handler);
+  el.addEventListener('click', toastElHandler);
 }
 
 /* ---------- 云同步弹窗辅助 ---------- */
@@ -2590,10 +2659,19 @@ function bindEvents(){
 
   // 删除一块碎片。V2.0：删父素材前先把它的子素材放回主流，
   // 否则子素材会永远看不见（防丢底线）。
+  // V2.5.5：不再弹 confirm——删完在底部给 6 秒「撤销」，这是 iOS 列表的做法：
+  // 滑动 + 一次确认 + 一个确认框，三道关卡换不来更少的手滑，只换来更慢的操作。
   async function removeFragment(id){
     const item = state.items.find(x=>x.id===id);
     if(!item) return;
-    if(!confirm(`确定删除这块碎片吗？\n\n「${(item.content||'（图片碎片）').slice(0,30)}…」\n\n删除后会同步到其他设备。`)) return;
+
+    // 撤销所需的全部信息：被删的那条，以及它下面每个子素材原本挂在谁身上。
+    // tags 单独复制一份：浅拷贝会跟原对象共用数组，撤销后再编辑标签会互相污染。
+    const snap = {
+      item: Object.assign({}, item, { tags: (item.tags || []).slice() }),
+      kids: state.items.filter(x=>x.parentId===id).map(k=>({ id:k.id, parentId:k.parentId }))
+    };
+
     const now = Date.now();
     const kids = state.items.filter(x=>x.parentId===id);
     for(const k of kids){
@@ -2605,7 +2683,38 @@ function bindEvents(){
     await cloudSync.tombstone(id); // 记墓碑并触发云同步（未开启同步时无副作用）
     state.items = state.items.filter(x=>x.id!==id);
     render.all();
-    await backup.run(false);
+    backup.run(false);
+
+    // 文案不拼碎片内容：碎片可能是一整段话，塞进胶囊会在手机上折成三行，
+    // 而删除是刚刚发生的动作，用户本来就知道删的是哪一条。
+    toastAction('已删除', '撤销', ()=>undoDelete(snap), 6000);
+  }
+
+  // 撤销删除：按原 id 写回，链接和关联关系都还在（id 没变）
+  async function undoDelete(snap){
+    try{
+      // 顺序要紧：先摘墓碑再写记录。反过来的话，万一两次操作之间同步跑了一次，
+      // 服务端会按墓碑把刚恢复的记录判死。
+      await cloudSync.unTombstone(snap.item.id);
+      await db.updateItem(snap.item);           // put：按主键覆盖写
+      state.items.push(snap.item);
+      for(const k of snap.kids){
+        const it = state.items.find(x=>x.id===k.id);
+        if(!it) continue;
+        it.parentId = k.parentId;
+        it.updatedAt = Date.now();
+        await db.updateItem(it);
+      }
+      render.all();
+      backup.run(false);
+      const back = SPACE_NAMES[snap.item.space];
+      toast(back && snap.item.space !== state.currentSpace
+        ? `已恢复，它在「${back}」`
+        : '已恢复');
+    }catch(err){
+      console.error(err);
+      toast('恢复失败，请看控制台');
+    }
   }
 
   const listBox = $('#masonry');

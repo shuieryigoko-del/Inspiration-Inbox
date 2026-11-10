@@ -105,6 +105,15 @@
     padding:7px 10px;
   }
   .search-box input{flex:1;border:none;outline:none;background:transparent;font-size:17px;}
+  /* 点标签筛选之后搜索框里是「#场景」，手动删要按三次退格；
+     手机上也没有系统的 search 取消按钮，给一个明确的出口。 */
+  .search-clear{
+    flex:0 0 auto;border:none;background:none;cursor:pointer;
+    color:var(--text-2);font-size:14px;line-height:1;padding:2px 3px;
+    border-radius:50%;
+  }
+  .search-clear:hover{color:var(--text);}
+  .search-clear[hidden]{display:none;}
   .top-actions{display:flex;align-items:center;gap:2px;margin-left:auto;flex-wrap:wrap;}
   .icon-btn{
     width:32px;height:32px;border-radius:8px;
@@ -284,7 +293,11 @@
     overflow-wrap:anywhere;cursor:pointer;}
   .frag-link:active{opacity:.55;}
   .card-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;}
-  .card-tag{font-size:13px;color:var(--text-2);background:none;padding:0;}
+  /* 标签现在可点：点一下按这个标签筛选。外观不变，只在悬停/按下时变蓝，
+     否则一排小字全都挂上下划线和手形，一行卡片里会有五六个"可点"的东西在喊。 */
+  .card-tag{font-size:13px;color:var(--text-2);background:none;padding:0;cursor:pointer;}
+  .card-tag:hover{color:var(--accent);}
+  .card-tag:active{color:var(--accent);opacity:.6;}
   /* V2.0 第四步：搜索穿透命中的子素材，卡头标注它属于谁——
      说明这块平时藏在父素材里、因搜索才出现，避免"凭空多出一条"的错觉 */
   .card-via{
@@ -593,10 +606,11 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.5</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.5.6</small></div>
   <div class="search-box">
     <span>🔍</span>
-    <input id="searchInput" type="search" placeholder="搜索灵感、标签…" autocomplete="off">
+    <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
+    <button id="searchClear" class="search-clear" type="button" aria-label="清空搜索" hidden>✕</button>
   </div>
   <div class="top-actions">
     <span id="backupReminder" class="backup-reminder"></span>
@@ -761,7 +775,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.5.5';
+const APP_VERSION = '2.5.6';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -993,7 +1007,19 @@ const render = {
   },
 
   visibleItems(){
-    const kw = state.search.trim().toLowerCase();
+    const raw = state.search.trim();
+    const kw = raw.toLowerCase();
+    // V2.5.6：`#` 开头 = 只看标签。点卡片上的标签就是往搜索框里写「#标签」，
+    // 所以这不算隐藏语法——它是点选之后你能看见的那一行字。
+    const tagOnly = kw.charAt(0) === '#';
+    const tagKw = tagOnly ? kw.slice(1) : '';
+    const tagsOf = x => x.tags || [];
+    const hit = x => {
+      if(!kw) return true;
+      if(tagOnly) return tagsOf(x).some(t=>t.toLowerCase().includes(tagKw));
+      return (x.content||'').toLowerCase().includes(kw)
+        || tagsOf(x).some(t=>t.toLowerCase().includes(kw));
+    };
     const alive = new Set(state.items.map(x=>x.id));
     // 被父素材收纳（父素材仍存在）= 平时应当隐藏的子碎片
     const folded = x => !!x.parentId && alive.has(x.parentId);
@@ -1007,9 +1033,7 @@ const render = {
       // 两者在关联模式下都不生效：否则正在挑素材时别人的子素材会冒出来，
       // 一旦被勾中就会把它从原父素材静默改挂走（parentId 是单值字段）。
       .filter(x=>!folded(x) || ((!!kw || state.godView) && !state.linkingParentId))
-      .filter(x=>!kw
-        || (x.content||'').toLowerCase().includes(kw)
-        || (x.tags||[]).some(t=>t.toLowerCase().includes(kw)))
+      .filter(hit)
       .sort((a,b)=>b.createdAt-a.createdAt);
   },
 
@@ -1035,8 +1059,11 @@ const render = {
     if(!list.length){
       const empty = document.createElement('div');
       empty.className = 'empty';
-      empty.textContent = state.search
-        ? '没有命中的碎片，换个关键词试试。'
+      const q = state.search.trim();
+      empty.textContent = q
+        ? (q.charAt(0) === '#'
+            ? `没有带 ${q} 的碎片。搜「${q.slice(1)}」不用加 #。`
+            : '没有命中的碎片，换个关键词试试。')
         : `「${SPACE_NAMES[state.currentSpace]}」还是空的，封存第一块碎片吧。`;
       box.appendChild(empty);
       return;
@@ -1170,6 +1197,8 @@ const render = {
       img.src = item.image;
       img.alt = '';
       img.loading = 'lazy';
+      // Base64 大图解码是同步开销，滚动时会让主线程卡顿；异步解码把 decode 挪出渲染路径
+      img.decoding = 'async';
       if(item.imageW && item.imageH){
         // 新数据：图片解码前就按比例占位，同列卡片不会被下推、卡片不闪
         wrap.style.aspectRatio = (item.imageW/item.imageH).toFixed(4);
@@ -1221,6 +1250,8 @@ const render = {
         const tag = document.createElement('span');
         tag.className = 'card-tag';
         tag.textContent = '#'+t;
+        tag.dataset.tag = t;          // 点它 = 按这个标签筛选（见下方 applyTagFilter）
+        tag.title = '只看这个标签';
         tags.appendChild(tag);
       });
       body.appendChild(tags);
@@ -1293,6 +1324,8 @@ const render = {
         const tag = document.createElement('span');
         tag.className = 'card-tag';
         tag.textContent = '#'+t;
+        tag.dataset.tag = t;          // 点它 = 按这个标签筛选（见下方 applyTagFilter）
+        tag.title = '只看这个标签';
         tags.appendChild(tag);
       });
       body.appendChild(tags);
@@ -2636,9 +2669,36 @@ function bindEvents(){
     });
   });
 
+  // —— 点标签筛选 ——
+  // 不维护独立的筛选状态，而是把这个标签写进搜索框：
+  // 用户需要能看见"列表为什么变少了"，也需要一个已经熟悉的地方把它清掉。
+  // 程序赋值不会触发 input 事件，所以这里自己调一次 cards()。
+  function applyTagFilter(tag){
+    const q = '#' + tag;
+    state.search = q;
+    const input = $('#searchInput');
+    if(input) input.value = q;
+    syncSearchClear();
+    render.cards();
+  }
+
+  // 搜索框右侧的 ✕：有内容才出现，点一下就清空（包括 #标签 筛选）
+  function syncSearchClear(){
+    const btn = $('#searchClear');
+    if(btn) btn.hidden = !state.search.trim();
+  }
+  $('#searchClear').addEventListener('click', ()=>{
+    state.search = '';
+    $('#searchInput').value = '';
+    syncSearchClear();
+    render.cards();
+    $('#searchInput').focus();
+  });
+
   // —— 实时搜索（防抖） ——
   $('#searchInput').addEventListener('input', utils.debounce((e)=>{
     state.search = e.target.value;
+    syncSearchClear();
     render.cards();
   },180));
 
@@ -2798,6 +2858,11 @@ function bindEvents(){
 
     if(delBtn){ await removeFragment(id); return; }
 
+    // V2.5.6：点标签 = 按这个标签筛选。放在关联模式之后——关联模式下点卡片是勾选，
+    // 不该因为点到了标签就把正在挑的一批素材换掉。
+    const tagEl = e.target.closest('[data-tag]');
+    if(tagEl){ applyTagFilter(tagEl.dataset.tag); return; }
+
     // 已经滑开的行，点一下只负责收起——和 iOS 列表一致，不会顺手把详情打开
     if(cardEl.closest('.swipe.open')){ closeSwipes(null); return; }
 
@@ -2817,6 +2882,10 @@ function bindEvents(){
     if(e.target.closest('#drawerUnlinkBtn')){ render.unlink(); return; }   // V2.0 第三步：剥离
     const mv = e.target.closest('[data-move-space]');                      // V2.5.4：换空间
     if(mv){ if(!mv.disabled) render.moveSpace(mv.dataset.moveSpace); return; }
+    // V2.5.6：抽屉里点标签 → 关掉详情，按这个标签筛一遍。
+    // 不关抽屉的话，筛选结果被抽屉压住，看起来像什么都没发生。
+    const tagEl = e.target.closest('[data-tag]');
+    if(tagEl){ render.closeDrawer(); applyTagFilter(tagEl.dataset.tag); return; }
     const kid = e.target.closest('.link-kid');   // V2.0 第二步：点条目推入子素材详情
     if(kid) render.pushChild(Number(kid.dataset.kidId));
   });

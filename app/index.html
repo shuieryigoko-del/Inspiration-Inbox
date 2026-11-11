@@ -995,7 +995,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.8.2</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.8.3</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -1231,7 +1231,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.8.2';
+const APP_VERSION = '2.8.3';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -3197,7 +3197,8 @@ const cloudSync = {
     [...localItems, ...((remote && remote.fragments) || [])].forEach(x=>{
       if(!x || typeof x.id !== 'number') return;
       const old = byId.get(x.id);
-      if(!old || stamp(x) >= stamp(old)) byId.set(x.id, x);
+      // 相等时保留本地（本地排在前面）：同一毫秒里改的东西，我这一端说了算
+      if(!old || stamp(x) > stamp(old)) byId.set(x.id, x);
     });
     // V2.7.1：音频本体不参与同步，所以远端版本里根本没有 audioUrl。
     // 若听凭"时间戳新的赢"，在 iPad 上改一个标签就会把手机里那段音频抹掉，
@@ -3219,24 +3220,31 @@ const cloudSync = {
     return { fragments:[...byId.values()].filter(x=>!dead.has(x.id)), tombstones:tombs };
   },
 
-  /* V2.8.2：写回前的最后一次 rebase（纯函数，便于自测）
+  /* V2.8.2 / V2.8.3：写回前的最后一次 rebase（纯函数，便于自测）
      merged      —— 用开头那份快照合并出来的结果
-     freshItems  —— 此刻库里真实存在的碎片（同步期间可能新封了几条）
+     freshItems  —— 此刻库里真实存在的碎片（同步期间可能新封、也可能被改过）
      freshTombs  —— 此刻库里真实的墓碑（同步期间可能删了几条）
      remoteTombs —— 远端带来的墓碑
 
-     规则只有两条：
+     规则三条：
        墓碑只增不减 —— 远端的可以往里加，但绝不能用旧快照替本地做主；
-       碎片以合并结果为准 —— 但本地库里还活着的不能被旧快照冲掉，
-       反过来，已被墓碑判死的也不许靠「本地还有」复活。
+       碎片按时间戳取新 —— 库里那条比合并结果新，就是同步期间被用户改过
+       （移动、编辑、改标签），旧快照不许把它盖回去；
+       已被墓碑判死的，也不许靠「本地还有」复活。
 
-     这一条如果退化回「直接写 mergedTombs」，表现就是：
-     同步进行中删掉的东西，下一轮从云端回来，再删再回来。 */
+     这两条退化任何一条，都会立刻看到对应的症状：
+       退化墓碑 → 同步进行中删掉的东西，下一轮从云端回来，再删再回来；
+       退化时间戳 → 移到冷库的碎片，编辑一下就又躺回工作台（v2.8.3 修的就是它）。 */
   _rebase(merged, freshItems, freshTombs, remoteTombs){
     const tombs = this._pruneTombs([...(freshTombs || []), ...(remoteTombs || [])]);
     const dead = new Set(tombs.map(t=>t.id));
+    const stamp = x => x.updatedAt || x.createdAt || 0;
     const byId = new Map((freshItems || []).map(x=>[x.id, x]));
-    ((merged && merged.fragments) || []).forEach(x=>byId.set(x.id, x));
+    ((merged && merged.fragments) || []).forEach(x=>{
+      const cur = byId.get(x.id);
+      if(cur && stamp(cur) > stamp(x)) return;  // 库里更新：它是用户在同步期间改的那一版
+      byId.set(x.id, x);
+    });
     return {
       fragments: [...byId.values()].filter(f=>!dead.has(f.id)),
       tombstones: tombs

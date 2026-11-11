@@ -995,7 +995,7 @@
 
 <!-- ====================== 页面骨架 ====================== -->
 <header class="topbar">
-  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.8.1</small></div>
+  <div class="logo">灵感收纳盒<small>Inspiration Inbox · v2.8.2</small></div>
   <div class="search-box">
     <span>🔍</span>
     <input id="searchInput" type="search" placeholder="搜索灵感，或 #标签" autocomplete="off">
@@ -1231,7 +1231,7 @@
 /* ============================================================
  * 第 1 层：常量与工具层（纯函数，不碰页面与数据库）
  * ============================================================ */
-const APP_VERSION = '2.8.1';
+const APP_VERSION = '2.8.2';
 const DB_NAME = 'inspiration-inbox';
 const DB_VERSION = 1;
 const STORE_FRAGMENTS = 'fragments';
@@ -3219,6 +3219,30 @@ const cloudSync = {
     return { fragments:[...byId.values()].filter(x=>!dead.has(x.id)), tombstones:tombs };
   },
 
+  /* V2.8.2：写回前的最后一次 rebase（纯函数，便于自测）
+     merged      —— 用开头那份快照合并出来的结果
+     freshItems  —— 此刻库里真实存在的碎片（同步期间可能新封了几条）
+     freshTombs  —— 此刻库里真实的墓碑（同步期间可能删了几条）
+     remoteTombs —— 远端带来的墓碑
+
+     规则只有两条：
+       墓碑只增不减 —— 远端的可以往里加，但绝不能用旧快照替本地做主；
+       碎片以合并结果为准 —— 但本地库里还活着的不能被旧快照冲掉，
+       反过来，已被墓碑判死的也不许靠「本地还有」复活。
+
+     这一条如果退化回「直接写 mergedTombs」，表现就是：
+     同步进行中删掉的东西，下一轮从云端回来，再删再回来。 */
+  _rebase(merged, freshItems, freshTombs, remoteTombs){
+    const tombs = this._pruneTombs([...(freshTombs || []), ...(remoteTombs || [])]);
+    const dead = new Set(tombs.map(t=>t.id));
+    const byId = new Map((freshItems || []).map(x=>[x.id, x]));
+    ((merged && merged.fragments) || []).forEach(x=>byId.set(x.id, x));
+    return {
+      fragments: [...byId.values()].filter(f=>!dead.has(f.id)),
+      tombstones: tombs
+    };
+  },
+
   // 合并后整体状态的指纹（碎片全量字段 + 墓碑，顺序无关）：
   // 与上次成功推送的指纹相同就跳过全量上传，避免每轮轮询把整个 Gist 重传一遍
   _stateHash(fragments, tombs){
@@ -3306,6 +3330,14 @@ const cloudSync = {
         mergedTombstones = merged.tombstones;
       }
 
+      // ② 之前先按「已知墓碑」剔一遍：一是别为已经删掉的碎片白下图片，
+      // 二是 ② 遇到正文图缺失会中止，不该让一条已删的碎片把整次同步卡死。
+      // 墓碑只增不减，这一剔是安全的；真正决定生死的是写回前那次 rebase。
+      {
+        const knownDead = new Set(mergedTombstones.map(t=>t.id));
+        mergedFragments = mergedFragments.filter(f=>!knownDead.has(f.id));
+      }
+
       // ① 本机有图但没有指纹的旧碎片（V1.5.1 前数据）：补算内容指纹。
       // V2.7.1：封面也补——它是这一版才开始走附件的，老数据全带着 Base64 却没有 coverRef。
       let refsAssigned = false;
@@ -3335,6 +3367,30 @@ const cloudSync = {
             attMap[f[refKey]] = attId;
           }
         }
+      }
+
+      /* ============ V2.8.2：写回前对齐本地真实状态 ============
+         同步是一场「读快照 → 走网络 → 写回」的长事务，中间有几秒到几十秒。
+         旧代码拿着第 3284 行那份快照一路走到底，于是有两个漏洞：
+
+         一、这期间用户删了一条：墓碑已经写进库里，而手里的 mergedTombstones
+             还是删除之前的快照 —— 写回时等于把墓碑抹掉。下一轮同步拉到云端
+             那条（它还在），本地又没有墓碑，于是原地复活。再删，再被抹掉，
+             再复活。这就是「删掉的碎片过一会又回来」。
+         二、这期间用户封存了一条：它不在快照里，state.items 被覆盖后界面上
+             消失，可库里还在 —— 刷新才看得见，像丢了一样。
+
+         所以写回前重读一次库，以库为准做最后一次 rebase。 */
+      const rebase = this._rebase(
+        { fragments: mergedFragments },
+        await db.getAll(),
+        (await db.getSetting('tombstones')) || [],
+        remotePlain && remotePlain.deletedIds
+      );
+      mergedFragments = rebase.fragments;
+      mergedTombstones = rebase.tombstones;
+
+      if(!notModified){
         await db.applyMerge(mergedFragments, mergedTombstones.map(t=>t.id));
         await db.setSetting('tombstones', mergedTombstones);
         state.items = mergedFragments;
@@ -4090,8 +4146,12 @@ function bindEvents(){
       k.updatedAt = now;
       await db.updateItem(k);
     }
+    // 顺序要紧：先立墓碑，再删记录。
+    // 反过来的话，两步之间若有同步正好跑完，它会拿着「记录已删、墓碑还没写」
+    // 的库去合并远端，把这条又拉回来（V2.8.2 查到的复活路径之一）。
+    // 墓碑先落地，即使后面删库失败，下次同步也会按墓碑判死——等于删了两次。
+    await cloudSync.tombstone(id);  // 记墓碑并触发云同步（未开启同步时只写一条本地设置）
     await db.deleteItem(id);
-    await cloudSync.tombstone(id); // 记墓碑并触发云同步（未开启同步时无副作用）
     audio.stopIf(id);              // V2.6.0：删掉的音乐卡不能还在后台唱
     state.items = state.items.filter(x=>x.id!==id);
     render.all();
